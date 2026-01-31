@@ -118,8 +118,8 @@ def volunteer_manage_pickups(request):
         if not volunteer_profile.latitude or not volunteer_profile.longitude:
             messages.warning(request, 'Please enable location access or set your location in your profile for accurate routing.')
         
-        # Use route optimizer with Google Maps integration
-        route_optimizer = get_route_optimizer(use_google_maps=True)
+        # Use route optimizer with geodesic calculations (free, no API key needed)
+        route_optimizer = get_route_optimizer(use_google_maps=False)
         
         # Use profile location as initial/fallback (frontend will use GPS)
         volunteer_lat = volunteer_profile.latitude or 0
@@ -504,8 +504,8 @@ def calculate_pickup_route(request):
                 'message': 'No valid pickup locations found'
             }, status=400)
         
-        # Calculate optimized route using Google Maps or geodesic fallback
-        route_optimizer = get_route_optimizer(use_google_maps=True)
+        # Calculate optimized route using geodesic calculations (free, no API key needed)
+        route_optimizer = get_route_optimizer(use_google_maps=False)
         optimized_route, total_distance, estimated_time = route_optimizer.nearest_neighbor_tsp(
             volunteer_location,
             pickup_locations
@@ -614,8 +614,8 @@ def calculate_delivery_route(request):
                 'message': 'No valid donation camps with coordinates found'
             }, status=400)
         
-        # Find nearest camp using Google Maps road distance
-        route_optimizer = get_route_optimizer(use_google_maps=True)
+        # Find nearest camp using geodesic distances (free, no API key needed)
+        route_optimizer = get_route_optimizer(use_google_maps=False)
         nearest_loc, total_distance, estimated_time = route_optimizer.find_nearest_location(
             volunteer_location, camp_locations
         )

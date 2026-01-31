@@ -402,15 +402,6 @@
         </button>
     </div>
     
-    {# Location Detection Status #}
-    <div class="location-status loading" id="location-status">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <circle cx="12" cy="12" r="3"/>
-        </svg>
-        <span id="location-status-text">Detecting your current location...</span>
-    </div>
-    
     {# Route Map (hidden until calculated) #}
     <div class="pickup-map-container" id="pickup-map-container" style="display: none;">
         <div id="pickup-route-map"></div>
@@ -622,15 +613,6 @@
 <div class="content-card">
     <h3>Deliver to Nearest Camp</h3>
     
-    {# Location Detection Status #}
-    <div class="location-status loading" id="delivery-location-status">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <circle cx="12" cy="12" r="3"/>
-        </svg>
-        <span id="delivery-location-text">Detecting your current location...</span>
-    </div>
-    
     {% if nearest_camp %}
         {# Map #}
         <div class="pickup-map-container">
@@ -737,94 +719,15 @@
 <script>
     document.body.dataset.currentView = "{{ view }}";
     
-    // Current live location storage
-    let currentGPSLocation = null;
-    let locationWatchId = null;
-    
-    // Start detecting GPS location immediately
+    // Initialize maps on page load
     document.addEventListener('DOMContentLoaded', function() {
-        startLocationDetection();
-        
-        {% if view == 'delivery_route' and nearest_camp_data and request.GET.tab != 'history' %}
+        {% if view == 'delivery_route' and nearest_camp_data %}
         initializeDeliveryMap();
+        {% else %}
+        // For pickups, initialize when route is calculated
         {% endif %}
     });
-    
-    /**
-     * Start GPS location detection
-     */
-    function startLocationDetection() {
-        const statusEl = document.getElementById('location-status') || document.getElementById('delivery-location-status');
-        const textEl = document.getElementById('location-status-text') || document.getElementById('delivery-location-text');
-        
-        if (!navigator.geolocation) {
-            if (statusEl) {
-                statusEl.classList.remove('loading');
-                statusEl.classList.add('error');
-            }
-            if (textEl) textEl.textContent = 'Geolocation is not supported by your browser';
-            return;
-        }
-        
-        // Use watchPosition for continuous updates
-        locationWatchId = navigator.geolocation.watchPosition(
-            function(position) {
-                currentGPSLocation = {
-                    lat: position.coords.latitude,
-                    lon: position.coords.longitude,
-                    accuracy: position.coords.accuracy
-                };
-                
-                if (statusEl) {
-                    statusEl.classList.remove('loading', 'error');
-                }
-                if (textEl) {
-                    textEl.textContent = `Location detected (accuracy: ${Math.round(position.coords.accuracy)}m)`;
-                }
-                
-                // Update server with location
-                sendLocationUpdate(currentGPSLocation.lat, currentGPSLocation.lon, currentGPSLocation.accuracy);
-            },
-            function(error) {
-                if (statusEl) {
-                    statusEl.classList.remove('loading');
-                    statusEl.classList.add('error');
-                }
-                let message = 'Unable to detect location';
-                switch(error.code) {
-                    case error.PERMISSION_DENIED:
-                        message = 'Please allow location access for route calculation';
-                        break;
-                    case error.POSITION_UNAVAILABLE:
-                        message = 'Location unavailable - using profile address as fallback';
-                        break;
-                    case error.TIMEOUT:
-                        message = 'Location request timed out - retrying...';
-                        break;
-                }
-                if (textEl) textEl.textContent = message;
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 5000
-            }
-        );
-    }
-    
-    /**
-     * Send location update to server
-     */
-    function sendLocationUpdate(lat, lon, accuracy) {
-        fetch('/api/update-volunteer-location/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({ latitude: lat, longitude: lon, accuracy: accuracy })
-        }).catch(err => console.error('Failed to update location:', err));
-    }
+
     
     // ============ PICKUP ROUTE CALCULATION (Mode A) ============
     let pickupMapInstance = null;
@@ -836,12 +739,7 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="loading-spinner"></span> Calculating...';
         
-        // Build request body with current GPS location if available
         const requestBody = {};
-        if (currentGPSLocation) {
-            requestBody.current_lat = currentGPSLocation.lat;
-            requestBody.current_lon = currentGPSLocation.lon;
-        }
         
         fetch('/api/calculate-pickup-route/', {
             method: 'POST',
@@ -975,160 +873,104 @@
     
     // ============ DELIVERY MAP (Mode B) ============
     let deliveryMapInstance = null;
-    let deliveryVolunteerMarker = null;
     
     function initializeDeliveryMap() {
-        const volunteerDataEl = document.getElementById('volunteer-location-data');
         const campDataEl = document.getElementById('nearest-camp-data');
         const mapContainer = document.getElementById('delivery-map');
         
         if (!mapContainer || !campDataEl) return;
         
-        const campData = JSON.parse(campDataEl.textContent);
-        
-        // Wait for GPS location or use fallback
-        function initMap(startLat, startLon) {
-            if (typeof L === 'undefined') {
-                mapContainer.innerHTML = '<p class="empty-state">Map library failed to load.</p>';
-                return;
-            }
-            
-            deliveryMapInstance = L.map('delivery-map', {
-                zoomControl: true,
-                attributionControl: false
-            }).setView([startLat, startLon], 14);
-            
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(deliveryMapInstance);
-            
-            // Custom bike icon
-            const bikeIcon = L.divIcon({
-                className: 'volunteer-marker',
-                html: `<div style="width:36px;height:36px;background:#10b981;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                        <circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/>
-                        <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/>
-                    </svg>
-                </div>`,
-                iconSize: [36, 36],
-                iconAnchor: [18, 18]
-            });
-            
-            // Camp icon
-            const campIcon = L.divIcon({
-                className: 'camp-marker',
-                html: `<div style="width:36px;height:36px;background:#ef4444;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                </div>`,
-                iconSize: [36, 36],
-                iconAnchor: [18, 18]
-            });
-            
-            // Add volunteer marker
-            deliveryVolunteerMarker = L.marker([startLat, startLon], { icon: bikeIcon, zIndexOffset: 1000 })
-                .addTo(deliveryMapInstance)
-                .bindPopup('<strong>You are here</strong>');
-            
-            // Add camp marker
-            L.marker([campData.latitude, campData.longitude], { icon: campIcon })
-                .addTo(deliveryMapInstance)
-                .bindPopup(`<strong>${campData.name}</strong><br>${campData.ngo_name}<br><small>${campData.address}</small>`);
-            
-            // Add routing if Leaflet Routing is available
-            if (typeof L.Routing !== 'undefined') {
-                L.Routing.control({
-                    waypoints: [
-                        L.latLng(startLat, startLon),
-                        L.latLng(campData.latitude, campData.longitude)
-                    ],
-                    routeWhileDragging: false,
-                    show: false,
-                    addWaypoints: false,
-                    createMarker: function() { return null; }, // We already added markers
-                    lineOptions: {
-                        styles: [{ color: '#10b981', weight: 5, opacity: 0.8 }]
-                    }
-                }).addTo(deliveryMapInstance);
-            }
-            
-            // Fit bounds
-            deliveryMapInstance.fitBounds([
-                [startLat, startLon],
-                [campData.latitude, campData.longitude]
-            ], { padding: [50, 50] });
-            
-            // Update location status
-            const statusEl = document.getElementById('delivery-location-status');
-            if (statusEl) {
-                statusEl.classList.remove('loading');
-            }
+        let campData;
+        try {
+            campData = JSON.parse(campDataEl.textContent);
+        } catch (e) {
+            return;
         }
         
-        // If we have GPS location, use it; otherwise wait briefly then use fallback
-        if (currentGPSLocation) {
-            initMap(currentGPSLocation.lat, currentGPSLocation.lon);
-        } else if (volunteerDataEl) {
-            const volunteerData = JSON.parse(volunteerDataEl.textContent);
-            // Wait for GPS, then fallback
-            setTimeout(() => {
-                if (currentGPSLocation) {
-                    initMap(currentGPSLocation.lat, currentGPSLocation.lon);
-                } else {
-                    initMap(volunteerData.lat, volunteerData.lon);
+        if (typeof L === 'undefined') return;
+        
+        // Get volunteer location from data or use default
+        const volunteerDataEl = document.getElementById('volunteer-location-data');
+        let volunteerLat = 28.6448, volunteerLon = 77.2167;
+        
+        if (volunteerDataEl) {
+            try {
+                const volunteerData = JSON.parse(volunteerDataEl.textContent);
+                volunteerLat = volunteerData.lat || volunteerLat;
+                volunteerLon = volunteerData.lon || volunteerLon;
+            } catch (e) {}
+        }
+        
+        // Initialize map centered between volunteer and camp
+        deliveryMapInstance = L.map('delivery-map', {
+            zoomControl: true,
+            attributionControl: false
+            }).setView([volunteerLat, volunteerLon], 14);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(deliveryMapInstance);
+        
+        // Custom bike icon for volunteer
+        const bikeIcon = L.divIcon({
+            className: 'volunteer-marker',
+            html: `<div style="width:36px;height:36px;background:#10b981;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/>
+                    <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/>
+                </svg>
+            </div>`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+        });
+        
+        // Custom house icon for camp
+        const campIcon = L.divIcon({
+            className: 'camp-marker',
+            html: `<div style="width:36px;height:36px;background:#ef4444;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+            </div>`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+        });
+        
+        // Add volunteer marker
+        L.marker([volunteerLat, volunteerLon], { icon: bikeIcon, zIndexOffset: 1000 })
+            .addTo(deliveryMapInstance)
+            .bindPopup('<strong>Your Location</strong>');
+        
+        // Add camp marker
+        L.marker([campData.latitude, campData.longitude], { icon: campIcon })
+            .addTo(deliveryMapInstance)
+            .bindPopup(`<strong>${campData.name}</strong><br>${campData.ngo_name}<br><small>${campData.address}</small>`);
+        
+        // Add routing line if available
+        if (typeof L.Routing !== 'undefined') {
+            L.Routing.control({
+                waypoints: [
+                    L.latLng(volunteerLat, volunteerLon),
+                    L.latLng(campData.latitude, campData.longitude)
+                ],
+                routeWhileDragging: false,
+                show: false,
+                addWaypoints: false,
+                createMarker: function() { return null; },
+                lineOptions: {
+                    styles: [{ color: '#10b981', weight: 5, opacity: 0.8 }]
                 }
-            }, 2000);
+            }).addTo(deliveryMapInstance);
         }
         
-        // Update volunteer marker when GPS updates
-        const originalWatchCallback = navigator.geolocation.watchPosition;
-        // We'll update the marker in the existing watch callback
-    }
-    
-    // Update delivery volunteer marker when GPS location changes
-    setInterval(function() {
-        if (currentGPSLocation && deliveryVolunteerMarker) {
-            deliveryVolunteerMarker.setLatLng([currentGPSLocation.lat, currentGPSLocation.lon]);
-            
-            // Update distance/ETA display
-            const campDataEl = document.getElementById('nearest-camp-data');
-            if (campDataEl) {
-                const campData = JSON.parse(campDataEl.textContent);
-                const distance = haversineDistance(
-                    currentGPSLocation.lat, currentGPSLocation.lon,
-                    campData.latitude, campData.longitude
-                );
-                const eta = Math.round((distance / 20) * 60); // 20 km/h avg
-                
-                const distEl = document.getElementById('delivery-distance');
-                const etaEl = document.getElementById('delivery-eta');
-                if (distEl) distEl.textContent = distance.toFixed(2);
-                if (etaEl) etaEl.textContent = eta;
-            }
-        }
-        
-        // Also update pickup map volunteer marker
-        if (currentGPSLocation && volunteerMarker) {
-            volunteerMarker.setLatLng([currentGPSLocation.lat, currentGPSLocation.lon]);
-        }
-    }, 3000);
-    
-    // Haversine distance calculation
-    function haversineDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371; // Earth radius in km
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
+        // Fit bounds to show both markers
+        deliveryMapInstance.fitBounds([
+            [volunteerLat, volunteerLon],
+            [campData.latitude, campData.longitude]
+        ], { padding: [50, 50] });
     }
     
     // Cleanup on page unload
     window.addEventListener('beforeunload', function() {
-        if (locationWatchId !== null) {
             navigator.geolocation.clearWatch(locationWatchId);
         }
     });

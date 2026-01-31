@@ -40,8 +40,6 @@ env = environ.Env(
     VAPID_PRIVATE_KEY=(str, ''),
     VAPID_ADMIN_EMAIL=(str, ''),
     
-    # Google Maps API
-    GOOGLE_MAPS_API_KEY=(str, ''),
 )
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
@@ -228,5 +226,4 @@ WEBPUSH_SETTINGS = {
     "VAPID_ADMIN_EMAIL": env('VAPID_ADMIN_EMAIL')
 }
 
-# Google Maps API Configuration
-GOOGLE_MAPS_API_KEY = env('GOOGLE_MAPS_API_KEY')
+
