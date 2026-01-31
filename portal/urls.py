@@ -2,6 +2,7 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
+from .views import verification_views, tracking_views, trust_score_views
 
 urlpatterns = [
     # --- Service Worker URL ---
@@ -13,6 +14,8 @@ urlpatterns = [
     path('register/step-2/', views.register_step_2, name='register_step_2'),
     path('login/', views.login_page, name='login_page'),
     path('logout/', views.logout_view, name='logout'),
+    path('force-password-change/', views.force_password_change, name='force_password_change'),
+    path('api/check-username/', views.check_username_availability, name='check_username'),
     
     # --- Password Reset URLs ---
     path('password-reset/', 
@@ -51,6 +54,8 @@ urlpatterns = [
     path('dashboard/ngo/', views.ngo_dashboard_overview, name='ngo_dashboard_overview'),
     path('dashboard/ngo/camps/', views.ngo_manage_camps, name='ngo_manage_camps'),
     path('dashboard/ngo/volunteers/', views.ngo_manage_volunteers, name='ngo_manage_volunteers'),
+    path('dashboard/ngo/register-volunteer/', views.ngo_register_volunteer, name='ngo_register_volunteer'),
+    path('dashboard/ngo/reset-volunteer-password/<int:volunteer_id>/', views.ngo_reset_volunteer_password, name='ngo_reset_volunteer_password'),
     path('dashboard/ngo/profile/', views.ngo_profile, name='ngo_profile'),
     path('dashboard/ngo/settings/', views.ngo_settings, name='ngo_settings'),
 
@@ -60,6 +65,11 @@ urlpatterns = [
     path('dashboard/volunteer/camps/', views.volunteer_manage_camps, name='volunteer_manage_camps'),
     path('dashboard/volunteer/profile/', views.volunteer_profile, name='volunteer_profile'),
     path('dashboard/volunteer/settings/', views.volunteer_settings, name='volunteer_settings'),
+    
+    # --- Route Optimization APIs ---
+    path('api/calculate-pickup-route/', views.calculate_pickup_route, name='calculate_pickup_route'),
+    path('api/calculate-delivery-route/', views.calculate_delivery_route, name='calculate_delivery_route'),
+    path('api/volunteer-stats/', views.get_volunteer_stats, name='volunteer_stats'),
     
     # --- Action URLs ---
     path('register_with_ngo/<int:ngo_id>/', views.register_with_ngo, name='register_with_ngo'),
@@ -78,4 +88,25 @@ urlpatterns = [
     # --- Gamification URLs ---
     path('donation/rate/<int:donation_id>/', views.rate_donation, name='rate_donation'),
     path('leaderboard/', views.volunteer_leaderboard, name='volunteer_leaderboard'),
+    
+    # --- Verification & Trust Protocol URLs ---
+    path('dashboard/ngo/verifications/', verification_views.ngo_pending_verifications, name='ngo_pending_verifications'),
+    path('donation/verify/<int:donation_id>/', verification_views.verify_and_approve_donation, name='verify_donation'),
+    path('donation/reject/<int:donation_id>/', verification_views.reject_donation_verification, name='reject_donation'),
+    path('donation/verify-detail/<int:donation_id>/', verification_views.donation_verification_detail, name='verify_donation_detail'),
+    path('volunteer/delivery-history/', verification_views.volunteer_delivery_history, name='volunteer_delivery_history'),
+    path('donation/submit-delivery/', verification_views.submit_delivery_confirmation, name='submit_delivery_confirmation'),
+    
+    # --- Real-Time Geolocation Tracking URLs ---
+    path('api/update-volunteer-location/', tracking_views.update_volunteer_location, name='update_volunteer_location'),
+    path('dashboard/volunteer/active-tracking/', tracking_views.volunteer_active_tracking, name='volunteer_active_tracking'),
+    path('dashboard/ngo/volunteer-locations/', tracking_views.ngo_volunteer_locations, name='ngo_volunteer_locations'),
+    path('api/get-volunteers-locations/', tracking_views.get_volunteers_locations_api, name='get_volunteers_locations_api'),
+    path('volunteer/location-privacy/', tracking_views.volunteer_location_privacy_settings, name='volunteer_location_privacy'),
+    
+    # --- Trust Score & Verification Protocol URLs ---
+    path('dashboard/volunteer/trust-score/', trust_score_views.volunteer_trust_dashboard, name='volunteer_trust_dashboard'),
+    path('api/volunteer-verification-stats/', trust_score_views.volunteer_verification_stats, name='volunteer_verification_stats'),
+    path('dashboard/ngo/volunteer-trust-profiles/', trust_score_views.ngo_volunteer_trust_profiles, name='ngo_volunteer_trust_profiles'),
+    path('dashboard/ngo/verification-analytics/', trust_score_views.donation_verification_analytics, name='donation_verification_analytics'),
 ]

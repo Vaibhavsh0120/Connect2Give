@@ -35,13 +35,19 @@
                     <input type="hidden" name="latitude" id="id_latitude">
                     <input type="hidden" name="longitude" id="id_longitude">
 
+                    {% if user_type_error %}
+                        <div class="auth-message error" style="margin-bottom: 16px;">
+                            <strong>Volunteer signup is disabled</strong><br>
+                            NGOs manage volunteer registrations. Please ask your NGO to register you as a volunteer.
+                        </div>
+                    {% endif %}
+
                     <div class="form-group">
                         <label for="user_type">I am a:</label>
                         <select name="user_type" id="user_type" required>
                             <option value="">Choose your role...</option>
                             <option value="RESTAURANT">🍽️ Restaurant (Donor)</option>
                             <option value="NGO">🏢 NGO</option>
-                            <option value="VOLUNTEER">🤝 Volunteer</option>
                         </select>
                     </div>
 

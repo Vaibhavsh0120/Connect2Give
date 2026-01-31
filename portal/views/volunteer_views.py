@@ -12,6 +12,7 @@ from django.http import JsonResponse
 from django.db import transaction
 from ..decorators import user_type_required
 from django.conf import settings
+from ..utils import RouteOptimizer, Location, build_route_map_data
 
 
 @login_required(login_url='login_page')
@@ -331,3 +332,235 @@ def volunteer_leaderboard(request):
         'volunteers': volunteers
     }
     return render(request, 'volunteer/leaderboard.html', context)
+
+
+@login_required(login_url='login_page')
+@user_type_required('VOLUNTEER')
+def calculate_pickup_route(request):
+    """API endpoint to calculate optimized pickup route using TSP"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid request'}, status=400)
+    
+    try:
+        volunteer_profile = request.user.volunteer_profile
+        
+        if not volunteer_profile.latitude or not volunteer_profile.longitude:
+            return JsonResponse({
+                'success': False, 
+                'message': 'Please set your location in your profile first'
+            }, status=400)
+        
+        # Get volunteer's current location
+        volunteer_location = Location(
+            lat=volunteer_profile.latitude,
+            lon=volunteer_profile.longitude,
+            location_id=0,
+            location_type='volunteer',
+            name='Your Location'
+        )
+        
+        # Get active accepted/collected donations
+        active_donations = Donation.objects.filter(
+            assigned_volunteer=volunteer_profile,
+            status__in=['ACCEPTED', 'COLLECTED']
+        ).select_related('restaurant')
+        
+        if not active_donations.exists():
+            return JsonResponse({
+                'success': False,
+                'message': 'You have no active pickups'
+            }, status=400)
+        
+        # Convert donations to Location objects
+        pickup_locations = []
+        for donation in active_donations:
+            if donation.restaurant.latitude and donation.restaurant.longitude:
+                pickup_locations.append(Location(
+                    lat=donation.restaurant.latitude,
+                    lon=donation.restaurant.longitude,
+                    location_id=donation.id,
+                    location_type='donation',
+                    name=f"{donation.restaurant.restaurant_name} - {donation.food_description}"
+                ))
+        
+        if not pickup_locations:
+            return JsonResponse({
+                'success': False,
+                'message': 'No valid pickup locations found'
+            }, status=400)
+        
+        # Calculate optimized route
+        optimized_route, total_distance = RouteOptimizer.nearest_neighbor_tsp(
+            volunteer_location,
+            pickup_locations
+        )
+        
+        # Estimate time
+        estimated_time = RouteOptimizer.estimate_time_minutes(
+            total_distance,
+            stops_count=len(pickup_locations)
+        )
+        
+        # Build response
+        return JsonResponse({
+            'success': True,
+            'route': build_route_map_data(optimized_route),
+            'total_distance_km': round(total_distance, 2),
+            'estimated_time_minutes': estimated_time,
+            'total_pickups': len(pickup_locations)
+        })
+    
+    except Exception as e:
+        print(f"Error calculating route: {e}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error calculating route: {str(e)}'
+        }, status=500)
+
+
+@login_required(login_url='login_page')
+@user_type_required('VOLUNTEER')
+def calculate_delivery_route(request):
+    """API endpoint to calculate optimized delivery route to nearest camp"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid request'}, status=400)
+    
+    try:
+        volunteer_profile = request.user.volunteer_profile
+        
+        if not volunteer_profile.latitude or not volunteer_profile.longitude:
+            return JsonResponse({
+                'success': False,
+                'message': 'Please set your location in your profile first'
+            }, status=400)
+        
+        # Check if volunteer has collected pickups
+        collected_donations = Donation.objects.filter(
+            assigned_volunteer=volunteer_profile,
+            status__in=['ACCEPTED', 'COLLECTED']
+        ).count()
+        
+        if collected_donations == 0:
+            return JsonResponse({
+                'success': False,
+                'message': 'You must collect pickups first'
+            }, status=400)
+        
+        # Get volunteer's location
+        volunteer_location = Location(
+            lat=volunteer_profile.latitude,
+            lon=volunteer_profile.longitude,
+            location_id=0,
+            location_type='volunteer',
+            name='Your Location'
+        )
+        
+        # Find nearest active donation camp
+        active_camps = DonationCamp.objects.filter(is_active=True).select_related('ngo')
+        
+        if not active_camps.exists():
+            return JsonResponse({
+                'success': False,
+                'message': 'No active donation camps found'
+            }, status=400)
+        
+        # Find nearest camp
+        nearest_camp = None
+        min_distance = float('inf')
+        
+        for camp in active_camps:
+            if camp.latitude and camp.longitude:
+                camp_location = Location(
+                    lat=camp.latitude,
+                    lon=camp.longitude,
+                    location_id=camp.id,
+                    location_type='camp'
+                )
+                distance = volunteer_location.distance_to(camp_location)
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_camp = (camp, camp_location)
+        
+        if not nearest_camp:
+            return JsonResponse({
+                'success': False,
+                'message': 'Could not find a valid delivery location'
+            }, status=400)
+        
+        camp, camp_location = nearest_camp
+        
+        # Calculate route from volunteer to camp
+        route = [volunteer_location, camp_location]
+        total_distance = min_distance
+        
+        estimated_time = RouteOptimizer.estimate_time_minutes(
+            total_distance,
+            stops_count=1
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'route': build_route_map_data(route),
+            'nearest_camp': {
+                'id': camp.id,
+                'name': camp.name,
+                'ngo_name': camp.ngo.ngo_name,
+                'address': camp.location_address
+            },
+            'total_distance_km': round(total_distance, 2),
+            'estimated_time_minutes': estimated_time
+        })
+    
+    except Exception as e:
+        print(f"Error calculating delivery route: {e}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error calculating route: {str(e)}'
+        }, status=500)
+
+
+@login_required(login_url='login_page')
+@user_type_required('VOLUNTEER')
+def get_volunteer_stats(request):
+    """API endpoint to get volunteer's current mode stats"""
+    try:
+        volunteer_profile = request.user.volunteer_profile
+        
+        # Get active pickups
+        active_pickups = Donation.objects.filter(
+            assigned_volunteer=volunteer_profile,
+            status__in=['ACCEPTED', 'COLLECTED']
+        ).count()
+        
+        # Get collected items
+        collected_items = Donation.objects.filter(
+            assigned_volunteer=volunteer_profile,
+            status='COLLECTED'
+        ).count()
+        
+        # Get pending verification
+        pending_verification = Donation.objects.filter(
+            assigned_volunteer=volunteer_profile,
+            status='VERIFICATION_PENDING'
+        ).count()
+        
+        # Get completed deliveries
+        completed_deliveries = Donation.objects.filter(
+            assigned_volunteer=volunteer_profile,
+            status='DELIVERED'
+        ).count()
+        
+        return JsonResponse({
+            'success': True,
+            'active_pickups': active_pickups,
+            'collected_items': collected_items,
+            'pending_verification': pending_verification,
+            'completed_deliveries': completed_deliveries,
+            'can_deliver': collected_items > 0 and active_pickups > 0
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        }, status=500)

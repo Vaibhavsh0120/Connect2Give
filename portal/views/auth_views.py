@@ -3,6 +3,8 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.messages import get_messages
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 from ..models import User, RestaurantProfile, NGOProfile, VolunteerProfile
 
 def get_user_dashboard_redirect(user):
@@ -16,29 +18,44 @@ def get_user_dashboard_redirect(user):
         # If user type is not set, redirect to complete the profile
         return redirect('register_step_2')
 
+@require_http_methods(["GET", "POST"])
+def check_username_availability(request):
+    """AJAX endpoint to check if username is available"""
+    if request.method == 'GET':
+        username = request.GET.get('username', '').strip().lower()
+        if not username:
+            return JsonResponse({'available': False, 'message': 'Username is required'})
+        
+        if len(username) < 3:
+            return JsonResponse({'available': False, 'message': 'Username must be at least 3 characters'})
+        
+        available = not User.objects.filter(username=username).exists()
+        return JsonResponse({
+            'available': available,
+            'message': 'Username is available' if available else 'Username is already taken'
+        })
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
 def register_step_1(request):
     if request.user.is_authenticated:
         return get_user_dashboard_redirect(request.user)
     if request.method == 'POST':
         full_name = request.POST.get('full_name')
         email = request.POST.get('email')
+        username = request.POST.get('username', '').strip().lower()
         password = request.POST.get('password')
         password2 = request.POST.get('password2')
 
+        # Validate username
+        if not username or len(username) < 3:
+            return render(request, 'auth/register_step_1.html', {'error': 'Username must be at least 3 characters.'})
+        if User.objects.filter(username=username).exists():
+            return render(request, 'auth/register_step_1.html', {'error': 'This username is already taken.'})
+        
         if password != password2:
             return render(request, 'auth/register_step_1.html', {'error': 'Passwords do not match.'})
         if User.objects.filter(email=email).exists():
             return render(request, 'auth/register_step_1.html', {'error': 'Email already registered.'})
-
-        # To keep it simple, we use the email's prefix as the username for manual signups.
-        # Ensure it's unique.
-        username = email.split('@')[0]
-        if User.objects.filter(username=username).exists():
-            # If the username exists, append a number to make it unique
-            i = 1
-            while User.objects.filter(username=f"{username}{i}").exists():
-                i += 1
-            username = f"{username}{i}"
 
         request.session['registration_data'] = {
             'full_name': full_name,
@@ -51,6 +68,7 @@ def register_step_1(request):
 
 def register_step_2(request):
     # This view now handles both manual and Google signup completions.
+    # DISABLED PUBLIC VOLUNTEER SIGNUP - NGOs only
     
     # For manual signup, data is in the session.
     registration_data = request.session.get('registration_data')
@@ -66,6 +84,12 @@ def register_step_2(request):
 
     if request.method == 'POST':
         user_type = request.POST.get('user_type')
+        
+        # Block public volunteer registration
+        if user_type == User.UserType.VOLUNTEER:
+            messages.error(request, 'Public volunteer signup is disabled. Please ask an NGO to register you.')
+            return render(request, 'auth/register_step_2.html', {'user_type_error': True})
+        
         latitude = request.POST.get('latitude') or None
         longitude = request.POST.get('longitude') or None
         address = request.POST.get('address')
@@ -107,16 +131,6 @@ def register_step_2(request):
                     latitude=latitude,
                     longitude=longitude
                 )
-            elif user_type == User.UserType.VOLUNTEER:
-                VolunteerProfile.objects.create(
-                    user=user,
-                    full_name=request.POST.get('full_name'),
-                    phone_number=request.POST.get('phone_number'),
-                    skills=request.POST.get('skills'),
-                    address=address,
-                    latitude=latitude,
-                    longitude=longitude
-                )
             
             messages.success(request, 'Registration successful! Please log in.')
             return redirect('login_page')
@@ -130,17 +144,54 @@ def register_step_2(request):
 
 def login_page(request):
     if request.user.is_authenticated:
+        # Check if user must change password
+        if request.user.must_change_password:
+            return redirect('force_password_change')
         return get_user_dashboard_redirect(request.user)
         
     if request.method == 'POST':
         user = authenticate(request, username=request.POST.get('username'), password=request.POST.get('password'))
         if user is not None:
             login(request, user)
+            # Check if user must change password
+            if user.must_change_password:
+                messages.warning(request, 'You must change your password before proceeding.')
+                return redirect('force_password_change')
             messages.success(request, f'Successfully signed in as {user.username}.')
             return get_user_dashboard_redirect(user)
         else:
             return render(request, 'auth/login.html', {'error': 'Invalid username or password.'})
     return render(request, 'auth/login.html')
+
+@login_required(login_url='login_page')
+def force_password_change(request):
+    """Force user to change password if must_change_password flag is True"""
+    if not request.user.must_change_password:
+        return redirect('login_page')
+    
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password')
+        new_password2 = request.POST.get('new_password2')
+        
+        if new_password != new_password2:
+            messages.error(request, 'Passwords do not match.')
+            return render(request, 'auth/force_password_change.html')
+        
+        if len(new_password) < 8:
+            messages.error(request, 'Password must be at least 8 characters long.')
+            return render(request, 'auth/force_password_change.html')
+        
+        request.user.set_password(new_password)
+        request.user.must_change_password = False
+        request.user.save()
+        
+        # Re-authenticate the user with new password
+        login(request, request.user, backend='django.contrib.auth.backends.ModelBackend')
+        
+        messages.success(request, 'Password changed successfully!')
+        return get_user_dashboard_redirect(request.user)
+    
+    return render(request, 'auth/force_password_change.html')
 
 def logout_view(request):
     storage = get_messages(request)
