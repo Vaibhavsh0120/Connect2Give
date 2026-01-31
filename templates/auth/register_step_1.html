@@ -47,6 +47,25 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="username">Username</label>
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input 
+                                type="text" 
+                                name="username" 
+                                id="username" 
+                                required 
+                                minlength="3"
+                                autocomplete="username"
+                                style="width: 100%;"
+                                placeholder="Choose a unique username"
+                                oninput="checkUsername()"
+                            >
+                            <span id="username-status" style="position: absolute; right: 12px; font-size: 18px;"></span>
+                        </div>
+                        <small id="username-message" style="color: #64748b; font-size: 0.85rem; display: block; margin-top: 4px;">Minimum 3 characters</small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="email">Email Address</label>
                         <input type="email" name="email" id="email" required autocomplete="email">
                     </div>
@@ -78,7 +97,7 @@
                         </div>
                     </div>
 
-                    <button type="submit" class="auth-submit-btn">Continue to Step 2 →</button>
+                    <button type="submit" class="auth-submit-btn" id="submit-btn">Continue to Step 2 →</button>
                 </form>
 
                 <div class="auth-links">
@@ -112,8 +131,57 @@
             }
         }
 
+        function checkUsername() {
+            const username = document.getElementById('username').value.trim().toLowerCase();
+            const statusEl = document.getElementById('username-status');
+            const messageEl = document.getElementById('username-message');
+            const submitBtn = document.getElementById('submit-btn');
+
+            if (username.length < 3) {
+                statusEl.innerHTML = '';
+                messageEl.textContent = 'Minimum 3 characters';
+                messageEl.style.color = '#64748b';
+                submitBtn.disabled = false;
+                return;
+            }
+
+            // Check availability via AJAX
+            fetch(`{% url 'check_username' %}?username=${encodeURIComponent(username)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.available) {
+                        statusEl.innerHTML = '✓';
+                        statusEl.style.color = '#10b981';
+                        messageEl.textContent = data.message;
+                        messageEl.style.color = '#10b981';
+                        submitBtn.disabled = false;
+                    } else {
+                        statusEl.innerHTML = '✕';
+                        statusEl.style.color = '#ef4444';
+                        messageEl.textContent = data.message;
+                        messageEl.style.color = '#ef4444';
+                        submitBtn.disabled = true;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking username:', error);
+                    statusEl.innerHTML = '';
+                    messageEl.textContent = 'Could not verify username';
+                    messageEl.style.color = '#f59e0b';
+                });
+        }
+
         document.querySelector('form').addEventListener('submit', function(e) {
             const submitBtn = this.querySelector('.auth-submit-btn');
+            const username = document.getElementById('username').value.trim();
+            
+            // Final check that username is available
+            if (username.length < 3) {
+                e.preventDefault();
+                alert('Username must be at least 3 characters long');
+                return;
+            }
+            
             submitBtn.classList.add('loading');
             submitBtn.disabled = true;
         });

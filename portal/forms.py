@@ -1,7 +1,9 @@
 # portal/forms.py
 
 from django import forms
-from .models import DonationCamp, Donation, NGOProfile, RestaurantProfile, VolunteerProfile
+from django.core.exceptions import ValidationError
+import re
+from .models import DonationCamp, Donation, NGOProfile, RestaurantProfile, VolunteerProfile, User
 
 class DonationCampForm(forms.ModelForm):
     """
@@ -121,3 +123,59 @@ class VolunteerProfileForm(forms.ModelForm):
             'longitude': forms.HiddenInput(),
             'address': forms.Textarea(attrs={'rows': 3}),
         }
+    
+    def clean_full_name(self):
+        """Validate that full_name contains only alphabetic characters and spaces"""
+        full_name = self.cleaned_data.get('full_name', '').strip()
+        if not re.match(r'^[a-zA-Z\s]+$', full_name):
+            raise ValidationError('Full name can only contain alphabetic characters and spaces.')
+        return full_name
+
+class NGORegisterVolunteerForm(forms.Form):
+    """
+    A form for NGOs to register new volunteers.
+    """
+    full_name = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={'placeholder': 'John Doe', 'class': 'form-control'}),
+        label='Volunteer Full Name',
+        help_text='Alphabetic characters and spaces only'
+    )
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={'placeholder': 'volunteer@example.com', 'class': 'form-control'}),
+        label='Email Address'
+    )
+    phone_number = forms.CharField(
+        max_length=15,
+        widget=forms.TextInput(attrs={'placeholder': '+91 98765 43210', 'class': 'form-control'}),
+        label='Phone Number'
+    )
+    aadhar_number = forms.CharField(
+        max_length=12,
+        widget=forms.TextInput(attrs={'placeholder': '123456789012', 'class': 'form-control'}),
+        label='Aadhar Card Number (12 digits)',
+        help_text='Required for verification'
+    )
+    
+    def clean_full_name(self):
+        """Validate that full_name contains only alphabetic characters and spaces"""
+        full_name = self.cleaned_data.get('full_name', '').strip()
+        if not re.match(r'^[a-zA-Z\s]+$', full_name):
+            raise ValidationError('Full name can only contain alphabetic characters and spaces.')
+        return full_name
+    
+    def clean_aadhar_number(self):
+        """Validate Aadhar number is 12 digits"""
+        aadhar = self.cleaned_data.get('aadhar_number', '').strip()
+        if not aadhar.isdigit() or len(aadhar) != 12:
+            raise ValidationError('Aadhar number must be exactly 12 digits.')
+        if VolunteerProfile.objects.filter(aadhar_number=aadhar).exists():
+            raise ValidationError('This Aadhar number is already registered.')
+        return aadhar
+    
+    def clean_email(self):
+        """Validate email is unique"""
+        email = self.cleaned_data.get('email', '').strip().lower()
+        if User.objects.filter(email=email).exists():
+            raise ValidationError('This email is already registered in the system.')
+        return email

@@ -3,8 +3,14 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Count
 from django.contrib import messages
-from ..models import DonationCamp, Donation, NGOProfile
-from ..forms import DonationCampForm, NGOProfileForm
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.conf import settings
+import secrets
+import string
+from ..models import DonationCamp, Donation, NGOProfile, VolunteerProfile, User, NGOVolunteer
+from ..forms import DonationCampForm, NGOProfileForm, NGORegisterVolunteerForm
 from ..decorators import user_type_required
 
 @login_required(login_url='login_page')
@@ -94,3 +100,129 @@ def ngo_profile(request):
 @user_type_required('NGO')
 def ngo_settings(request):
     return render(request, 'ngo/settings.html')
+
+@login_required(login_url='login_page')
+@user_type_required('NGO')
+def ngo_register_volunteer(request):
+    """NGO portal to register new volunteers"""
+    ngo_profile = request.user.ngo_profile
+    
+    if request.method == 'POST':
+        form = NGORegisterVolunteerForm(request.POST)
+        if form.is_valid():
+            # Generate temporary password
+            temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+            
+            # Create unique username
+            base_username = form.cleaned_data['email'].split('@')[0]
+            username = base_username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+            
+            # Create user
+            try:
+                user = User.objects.create_user(
+                    username=username,
+                    email=form.cleaned_data['email'],
+                    password=temp_password,
+                    user_type=User.UserType.VOLUNTEER,
+                    first_name=form.cleaned_data['full_name'].split(' ')[0],
+                    last_name=' '.join(form.cleaned_data['full_name'].split(' ')[1:]),
+                    must_change_password=True  # Force password change
+                )
+                
+                # Create volunteer profile
+                volunteer_profile = VolunteerProfile.objects.create(
+                    user=user,
+                    full_name=form.cleaned_data['full_name'],
+                    email=form.cleaned_data['email'],
+                    phone_number=form.cleaned_data['phone_number'],
+                    aadhar_number=form.cleaned_data['aadhar_number'],
+                    registered_ngo=ngo_profile
+                )
+                
+                # Add to NGO's volunteers
+                NGOVolunteer.objects.create(ngo=ngo_profile, volunteer=volunteer_profile)
+                
+                # Send email with credentials
+                subject = f'Welcome to Connect2Give - Your Account Details'
+                context = {
+                    'volunteer_name': form.cleaned_data['full_name'],
+                    'username': username,
+                    'temp_password': temp_password,
+                    'ngo_name': ngo_profile.ngo_name,
+                    'login_url': request.build_absolute_uri('/login/'),
+                }
+                html_message = render_to_string('emails/volunteer_invitation.html', context)
+                plain_message = strip_tags(html_message)
+                
+                send_mail(
+                    subject,
+                    plain_message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [form.cleaned_data['email']],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
+                
+                messages.success(request, f'Volunteer {form.cleaned_data["full_name"]} registered successfully! Invitation email sent.')
+                form = NGORegisterVolunteerForm()  # Reset form
+                
+            except Exception as e:
+                messages.error(request, f'Error registering volunteer: {str(e)}')
+    else:
+        form = NGORegisterVolunteerForm()
+    
+    # Get registered volunteers for this NGO
+    registered_volunteers = VolunteerProfile.objects.filter(registered_ngo=ngo_profile).select_related('user').order_by('-created_at')
+    
+    context = {
+        'form': form,
+        'registered_volunteers': registered_volunteers,
+    }
+    return render(request, 'ngo/register_volunteer.html', context)
+
+@login_required(login_url='login_page')
+@user_type_required('NGO')
+def ngo_reset_volunteer_password(request, volunteer_id):
+    """Reset volunteer password and resend invitation"""
+    ngo_profile = request.user.ngo_profile
+    volunteer_profile = get_object_or_404(VolunteerProfile, id=volunteer_id, registered_ngo=ngo_profile)
+    
+    if request.method == 'POST':
+        # Generate new temporary password
+        temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+        
+        # Update user password
+        volunteer_profile.user.set_password(temp_password)
+        volunteer_profile.user.must_change_password = True
+        volunteer_profile.user.save()
+        
+        # Send email with new credentials
+        subject = f'Connect2Give - Password Reset'
+        context = {
+            'volunteer_name': volunteer_profile.full_name,
+            'username': volunteer_profile.user.username,
+            'temp_password': temp_password,
+            'ngo_name': ngo_profile.ngo_name,
+            'login_url': request.build_absolute_uri('/login/'),
+        }
+        html_message = render_to_string('emails/volunteer_password_reset.html', context)
+        plain_message = strip_tags(html_message)
+        
+        send_mail(
+            subject,
+            plain_message,
+            settings.DEFAULT_FROM_EMAIL,
+            [volunteer_profile.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        
+        messages.success(request, f'New password sent to {volunteer_profile.full_name}')
+        return redirect('ngo_register_volunteer')
+    
+    context = {'volunteer': volunteer_profile}
+    return render(request, 'ngo/reset_volunteer_password.html', context)
