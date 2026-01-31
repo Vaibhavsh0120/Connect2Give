@@ -160,7 +160,7 @@ class Donation(models.Model):
     food_description = models.CharField(max_length=255, help_text="e.g., 20 veg thalis, 5kg rice")
     quantity = models.PositiveIntegerField(help_text="e.g., number of meals, weight in kg")
     pickup_address = models.TextField()
-    status = models.CharField(max_length=10, choices=DonationStatus.choices, default=DonationStatus.PENDING, db_index=True)
+    status = models.CharField(max_length=20, choices=DonationStatus.choices, default=DonationStatus.PENDING, db_index=True)
     assigned_volunteer = models.ForeignKey(VolunteerProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_donations', db_index=True)
     target_camp = models.ForeignKey(DonationCamp, on_delete=models.SET_NULL, null=True, blank=True, related_name='donations_received', db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
