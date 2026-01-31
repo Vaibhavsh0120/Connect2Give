@@ -17,6 +17,10 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        .required-star {
+            color: #ef4444;
+            margin-left: 2px;
+        }
     </style>
 </head>
 <body>
@@ -54,27 +58,27 @@
                     <div id="restaurant-fields" class="hidden-fields">
                         <h3 style="margin-bottom: 1.5rem; color: #334155;">Restaurant Information</h3>
                         <div class="form-group">
-                            <label for="restaurant_name">Restaurant Name</label>
-                            <input type="text" name="restaurant_name" id="restaurant_name">
+                            <label for="restaurant_name">Restaurant Name <span class="required-star">*</span></label>
+                            <input type="text" name="restaurant_name" id="restaurant_name" data-required-for="RESTAURANT">
                         </div>
                         <div class="form-group">
-                            <label for="restaurant_phone_number">Phone Number</label>
-                            <input type="tel" name="restaurant_phone_number" id="restaurant_phone_number">
+                            <label for="restaurant_phone_number">Phone Number <span class="required-star">*</span></label>
+                            <input type="tel" name="restaurant_phone_number" id="restaurant_phone_number" data-required-for="RESTAURANT">
                         </div>
                     </div>
 
                     <div id="ngo-fields" class="hidden-fields">
                         <h3 style="margin-bottom: 1.5rem; color: #334155;">NGO Information</h3>
                         <div class="form-group">
-                            <label for="ngo_name">NGO Name</label>
-                            <input type="text" name="ngo_name" id="ngo_name">
+                            <label for="ngo_name">NGO Name <span class="required-star">*</span></label>
+                            <input type="text" name="ngo_name" id="ngo_name" data-required-for="NGO">
                         </div>
                         <div class="form-group">
-                            <label for="registration_number">Registration Number</label>
-                            <input type="text" name="registration_number" id="registration_number">
+                            <label for="registration_number">Registration Number <span class="required-star">*</span></label>
+                            <input type="text" name="registration_number" id="registration_number" data-required-for="NGO">
                         </div>
                         <div class="form-group">
-                            <label for="contact_number">Contact Number</label>
+                            <label for="contact_number">Contact Number <span class="required-star">*</span></label>
                             <input type="tel" 
                                    name="contact_number" 
                                    id="contact_number" 
@@ -83,7 +87,7 @@
                                    inputmode="numeric"
                                    placeholder="9876543210"
                                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);"
-                                   required>
+                                   data-required-for="NGO">
                             <small class="form-help-text">Enter a valid 10-digit mobile number (digits only)</small>
                         </div>
                     </div>
@@ -140,6 +144,25 @@
             
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+            // Function to update required attributes dynamically
+            function updateRequiredFields(selectedType) {
+                // Get all fields with data-required-for attribute
+                const conditionalFields = document.querySelectorAll('[data-required-for]');
+                
+                conditionalFields.forEach(field => {
+                    const requiredFor = field.getAttribute('data-required-for');
+                    if (requiredFor === selectedType) {
+                        field.setAttribute('required', '');
+                    } else {
+                        field.removeAttribute('required');
+                        // Clear field value when hidden to avoid validation issues
+                        if (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') {
+                            // Don't clear if currently visible
+                        }
+                    }
+                });
+            }
+
             userTypeSelect.addEventListener('change', function() {
                 const selectedType = this.value;
                 
@@ -155,6 +178,10 @@
                     volunteerFields.style.display = 'block';
                     locationSection.style.display = 'block';
                 }
+                
+                // Update required attributes based on selected type
+                updateRequiredFields(selectedType);
+                
                 setTimeout(() => map.invalidateSize(), 10);
             });
 

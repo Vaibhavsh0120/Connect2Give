@@ -581,19 +581,23 @@
 </div>
 
 {# Delivery Tabs: Current / History #}
+{# Only show Current Delivery tab if collected_count > 0 AND uncollected_count == 0 #}
 <div class="delivery-tabs">
+    {% if collected_count > 0 and uncollected_count == 0 %}
     <a href="{% url 'volunteer_manage_pickups' %}?view=delivery_route" 
        class="delivery-tab {% if request.GET.tab != 'history' %}active{% endif %}">
         Current Delivery
     </a>
+    {% endif %}
     <a href="{% url 'volunteer_manage_pickups' %}?view=delivery_route&tab=history" 
-       class="delivery-tab {% if request.GET.tab == 'history' %}active{% endif %}">
+       class="delivery-tab {% if request.GET.tab == 'history' or collected_count == 0 or uncollected_count > 0 %}active{% endif %}">
         Delivery History
     </a>
 </div>
 
-{% if request.GET.tab == 'history' %}
+{% if request.GET.tab == 'history' or collected_count == 0 or uncollected_count > 0 %}
 {# ============ HISTORY TAB ============ #}
+{# Show history if explicitly selected OR if user doesn't meet criteria for Current Delivery #}
 <div class="content-card">
     <h3>My Delivery History</h3>
     <table class="data-table">
@@ -643,16 +647,6 @@
         {# Map #}
         <div class="pickup-map-container">
             <div id="delivery-map"></div>
-            <div class="map-legend">
-                <div class="map-legend-item">
-                    <div class="legend-marker" style="background: #10b981;"></div>
-                    <span>Your Location</span>
-                </div>
-                <div class="map-legend-item">
-                    <div class="legend-marker" style="background: #ef4444;"></div>
-                    <span>Donation Camp</span>
-                </div>
-            </div>
         </div>
         
         {# Route Info #}
@@ -670,10 +664,6 @@
                     <div class="route-detail-value">{{ collected_count|default:0 }}</div>
                     <div class="route-detail-label">Items to Deliver</div>
                 </div>
-            </div>
-            <div class="live-tracking-indicator" id="delivery-live-tracking">
-                <span class="pulse-dot"></span>
-                Live Tracking
             </div>
         </div>
         

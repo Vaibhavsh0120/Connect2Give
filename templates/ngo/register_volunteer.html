@@ -40,6 +40,7 @@
                             name="full_name" 
                             id="id_full_name" 
                             placeholder="John Doe"
+                            value="{{ form.full_name.value|default:'' }}"
                             required
                         >
                         {% if form.full_name.errors %}
@@ -58,6 +59,7 @@
                                 name="username" 
                                 id="id_username" 
                                 placeholder="volunteer_username"
+                                value="{{ form.username.value|default:'' }}"
                                 autocomplete="off"
                                 required
                             >
@@ -80,6 +82,7 @@
                             name="email" 
                             id="id_email" 
                             placeholder="volunteer@example.com"
+                            value="{{ form.email.value|default:'' }}"
                             required
                         >
                         {% if form.email.errors %}
@@ -96,6 +99,7 @@
                             name="phone_number" 
                             id="id_phone_number" 
                             placeholder="+91 98765 43210"
+                            value="{{ form.phone_number.value|default:'' }}"
                             required
                         >
                         {% if form.phone_number.errors %}
@@ -112,6 +116,7 @@
                             name="aadhar_number" 
                             id="id_aadhar_number" 
                             placeholder="123456789012"
+                            value="{{ form.aadhar_number.value|default:'' }}"
                             required
                             maxlength="12"
                         >
@@ -183,7 +188,7 @@
                         id="id_volunteer_address" 
                         rows="3" 
                         placeholder="Enter volunteer's primary address..."
-                    ></textarea>
+                    >{{ form.address.value|default:'' }}</textarea>
                     <div class="address-buttons">
                         <button type="button" class="btn-map-action" onclick="findAddressOnMap()">Find on Map</button>
                     </div>
@@ -280,16 +285,20 @@
 
     .btn-check-username {
         padding: 0.5rem 1rem;
-        background: var(--bg-card-hover);
-        border: 1px solid var(--border);
+        background: #3b82f6;
+        color: white;
+        border: 1px solid #3b82f6;
         border-radius: var(--radius);
         cursor: pointer;
         font-size: 0.875rem;
+        font-weight: 500;
         white-space: nowrap;
+        transition: all 0.2s;
     }
 
     .btn-check-username:hover {
-        background: var(--border-light);
+        background: #2563eb;
+        border-color: #2563eb;
     }
 
     #username-status.available {
