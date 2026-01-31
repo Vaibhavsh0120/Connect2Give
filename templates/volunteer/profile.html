@@ -65,11 +65,22 @@
                     <div class="address-group">
                         {{ form.address }}
                         <button type="button" class="map-action-btn" onclick="findAddressOnMap()">Find Location</button>
+                        <button type="button" class="map-action-btn find-my-location-btn" onclick="findMyLocation()" style="background-color: #10b981;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;">
+                                <circle cx="12" cy="12" r="10"/>
+                                <circle cx="12" cy="12" r="3"/>
+                                <line x1="12" y1="2" x2="12" y2="6"/>
+                                <line x1="12" y1="18" x2="12" y2="22"/>
+                                <line x1="2" y1="12" x2="6" y2="12"/>
+                                <line x1="18" y1="12" x2="22" y2="12"/>
+                            </svg>
+                            Find My Location
+                        </button>
                     </div>
                 </div>
                 <div id="location-map"></div>
                 <p class="form-help-text">
-                    Type an address and click "Find Location", or click on the map to update your location.
+                    Type an address and click "Find Location", use "Find My Location" for GPS, or click on the map to update your location.
                 </p>
             </div>
 
@@ -136,6 +147,80 @@
                         alert("Address not found.");
                     }
                 });
+        }
+        
+        // Find My Location using Geolocation API
+        window.findMyLocation = function() {
+            if (!navigator.geolocation) {
+                showToast('Geolocation is not supported by your browser', 'error');
+                return;
+            }
+            
+            const btn = document.querySelector('.find-my-location-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading-spinner"></span> Finding...';
+            }
+            
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    // Reverse geocode to get address
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                        .then(r => r.json())
+                        .then(d => {
+                            updateMarkerAndFields(lat, lon, d.display_name || 'Location found');
+                            showToast('Location found successfully!', 'success');
+                        })
+                        .catch(() => {
+                            updateMarkerAndFields(lat, lon, `${lat.toFixed(6)}, ${lon.toFixed(6)}`);
+                            showToast('Location found!', 'success');
+                        })
+                        .finally(() => {
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <line x1="12" y1="2" x2="12" y2="6"/>
+                                    <line x1="12" y1="18" x2="12" y2="22"/>
+                                    <line x1="2" y1="12" x2="6" y2="12"/>
+                                    <line x1="18" y1="12" x2="22" y2="12"/>
+                                </svg> Find My Location`;
+                            }
+                        });
+                },
+                function(error) {
+                    let message = 'Unable to find your location';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            message = 'Please allow location access in your browser settings';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message = 'Location information unavailable';
+                            break;
+                        case error.TIMEOUT:
+                            message = 'Location request timed out';
+                            break;
+                    }
+                    showToast(message, 'error');
+                    
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="3"/>
+                            <line x1="12" y1="2" x2="12" y2="6"/>
+                            <line x1="12" y1="18" x2="12" y2="22"/>
+                            <line x1="2" y1="12" x2="6" y2="12"/>
+                            <line x1="18" y1="12" x2="22" y2="12"/>
+                        </svg> Find My Location`;
+                    }
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
         }
         
         map.on('click', function (e) {

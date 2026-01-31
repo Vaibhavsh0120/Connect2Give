@@ -1,4 +1,16 @@
 # portal/utils/__init__.py
-from .route_optimization import RouteOptimizer, Location, build_route_map_data
+from .route_optimization import (
+    RouteOptimizer, 
+    Location, 
+    build_route_map_data, 
+    GoogleMapsService,
+    get_route_optimizer
+)
 
-__all__ = ['RouteOptimizer', 'Location', 'build_route_map_data']
+__all__ = [
+    'RouteOptimizer', 
+    'Location', 
+    'build_route_map_data', 
+    'GoogleMapsService',
+    'get_route_optimizer'
+]

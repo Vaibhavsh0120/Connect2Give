@@ -12,7 +12,7 @@ from django.http import JsonResponse
 from django.db import transaction
 from ..decorators import user_type_required
 from django.conf import settings
-from ..utils import RouteOptimizer, Location, build_route_map_data
+from ..utils import RouteOptimizer, Location, build_route_map_data, get_route_optimizer
 
 
 @login_required(login_url='login_page')
@@ -84,39 +84,96 @@ def volunteer_manage_pickups(request):
             Q(pickup_address__icontains=search_query)
         )
 
+    # Calculate stats for the new UI
+    collected_count = active_donations.filter(status='COLLECTED').count()
+    accepted_count = active_donations.filter(status='ACCEPTED').count()
+    pending_verification_count = Donation.objects.filter(
+        assigned_volunteer=volunteer_profile,
+        status='VERIFICATION_PENDING'
+    ).count()
+    total_deliveries = Donation.objects.filter(
+        assigned_volunteer=volunteer_profile,
+        status='DELIVERED'
+    ).count()
+    
+    # Guard logic for delivery mode access
+    has_uncollected_items = accepted_count > 0
+    can_access_delivery = collected_count > 0 and not has_uncollected_items
+    
     context = {
         'active_donations': active_donations,
         'available_donations': available_donations,
         'delivery_history': delivery_history,
-        'view': view
+        'view': view,
+        'collected_count': collected_count,
+        'uncollected_count': accepted_count,
+        'pending_verification_count': pending_verification_count,
+        'total_deliveries': total_deliveries,
+        'has_uncollected_items': has_uncollected_items,
+        'can_access_delivery': can_access_delivery,
     }
 
     if view == 'delivery_route':
+        # Profile location is used as fallback; GPS location will be used in frontend
         if not volunteer_profile.latitude or not volunteer_profile.longitude:
-            messages.error(request, 'Please set your location in your profile before calculating routes.')
-            return redirect('volunteer_profile')
+            messages.warning(request, 'Please enable location access or set your location in your profile for accurate routing.')
         
-        volunteer_location = (volunteer_profile.latitude, volunteer_profile.longitude)
+        # Use route optimizer with Google Maps integration
+        route_optimizer = get_route_optimizer(use_google_maps=True)
+        
+        # Use profile location as initial/fallback (frontend will use GPS)
+        volunteer_lat = volunteer_profile.latitude or 0
+        volunteer_lon = volunteer_profile.longitude or 0
+        
+        volunteer_location = Location(
+            lat=volunteer_lat,
+            lon=volunteer_lon,
+            location_id=0,
+            location_type='volunteer',
+            name='Your Location'
+        )
+        
         active_camps = DonationCamp.objects.filter(ngo__in=volunteer_profile.registered_ngos.all(), is_active=True)
         
-        nearest_camp = None
-        min_dist = float('inf')
-
+        # Convert camps to Location objects
+        camp_locations = []
+        camp_map = {}  # Map location to camp
         for camp in active_camps:
             if camp.latitude and camp.longitude:
-                dist = geodesic(volunteer_location, (camp.latitude, camp.longitude)).km
-                if dist < min_dist:
-                    min_dist = dist
-                    nearest_camp = camp
+                loc = Location(
+                    lat=camp.latitude,
+                    lon=camp.longitude,
+                    location_id=camp.pk,
+                    location_type='camp',
+                    name=camp.name
+                )
+                camp_locations.append(loc)
+                camp_map[camp.pk] = camp
+        
+        # Find nearest camp using road distance (Google Maps) or geodesic fallback
+        nearest_camp = None
+        nearest_distance = 0
+        nearest_eta = 0
+        
+        if camp_locations:
+            nearest_loc, nearest_distance, nearest_eta = route_optimizer.find_nearest_location(
+                volunteer_location, camp_locations
+            )
+            if nearest_loc and nearest_loc.id in camp_map:
+                nearest_camp = camp_map[nearest_loc.id]
         
         context['nearest_camp'] = nearest_camp
+        context['nearest_distance_km'] = round(nearest_distance, 2)
+        context['nearest_eta_minutes'] = int(nearest_eta)
         
         if nearest_camp:
             context['nearest_camp_data'] = {
                 'name': nearest_camp.name,
                 'latitude': nearest_camp.latitude,
                 'longitude': nearest_camp.longitude,
-                'pk': nearest_camp.pk
+                'pk': nearest_camp.pk,
+                'ngo_name': nearest_camp.ngo.ngo_name,
+                'address': nearest_camp.location_address
             }
         context['volunteer_location_data'] = {
             'lat': volunteer_profile.latitude,
@@ -283,23 +340,44 @@ def mark_as_collected(request, donation_id):
 @login_required(login_url='login_page')
 @user_type_required('VOLUNTEER')
 def mark_as_delivered(request, camp_id):
+    """
+    Mark all collected donations as delivered to a camp.
+    Sets status to VERIFICATION_PENDING for NGO approval (Trust Protocol).
+    """
     if request.method != 'POST': 
         return redirect('index')
-    donations = Donation.objects.filter(assigned_volunteer=request.user.volunteer_profile, status__in=['ACCEPTED', 'COLLECTED'])
+    
+    volunteer_profile = request.user.volunteer_profile
+    
+    # Guard Logic: Check for uncollected items (accepted but not collected)
+    uncollected_count = Donation.objects.filter(
+        assigned_volunteer=volunteer_profile,
+        status='ACCEPTED'
+    ).count()
+    
+    if uncollected_count > 0:
+        messages.error(request, f'Cannot deliver yet. You have {uncollected_count} item(s) still marked as "Accepted" but not collected.')
+        return redirect('volunteer_manage_pickups')
+    
+    # Only deliver COLLECTED donations
+    donations = Donation.objects.filter(
+        assigned_volunteer=volunteer_profile, 
+        status='COLLECTED'
+    )
     camp = get_object_or_404(DonationCamp, pk=camp_id)
     
     updated_count = 0
     for donation in donations:
-        donation.status = 'VERIFYING'
+        donation.status = 'VERIFICATION_PENDING'  # Trust Protocol: Requires NGO verification
         donation.target_camp = camp
         donation.delivered_at = timezone.now()
         donation.save()
         updated_count += 1
         
     if updated_count > 0:
-        messages.success(request, f'{updated_count} item(s) marked as delivered and are pending verification by the NGO.')
+        messages.success(request, f'{updated_count} item(s) marked as delivered and are pending verification by {camp.ngo.ngo_name}.')
     else:
-        messages.warning(request, 'You had no active pickups to deliver.')
+        messages.warning(request, 'You had no collected pickups to deliver. Collect items first.')
 
     return redirect('volunteer_manage_pickups')
 
@@ -365,16 +443,32 @@ def calculate_pickup_route(request):
     try:
         volunteer_profile = request.user.volunteer_profile
         
-        if not volunteer_profile.latitude or not volunteer_profile.longitude:
+        # Try to get current GPS location from request body
+        try:
+            body = json.loads(request.body) if request.body else {}
+            current_lat = body.get('current_lat')
+            current_lon = body.get('current_lon')
+        except json.JSONDecodeError:
+            current_lat = None
+            current_lon = None
+        
+        # Use GPS location if available, otherwise fall back to profile location
+        if current_lat and current_lon:
+            volunteer_lat = float(current_lat)
+            volunteer_lon = float(current_lon)
+        elif volunteer_profile.latitude and volunteer_profile.longitude:
+            volunteer_lat = volunteer_profile.latitude
+            volunteer_lon = volunteer_profile.longitude
+        else:
             return JsonResponse({
                 'success': False, 
-                'message': 'Please set your location in your profile first'
+                'message': 'Please enable location access or set your location in your profile'
             }, status=400)
         
-        # Get volunteer's current location
+        # Get volunteer's current location (GPS or profile fallback)
         volunteer_location = Location(
-            lat=volunteer_profile.latitude,
-            lon=volunteer_profile.longitude,
+            lat=volunteer_lat,
+            lon=volunteer_lon,
             location_id=0,
             location_type='volunteer',
             name='Your Location'
@@ -410,17 +504,15 @@ def calculate_pickup_route(request):
                 'message': 'No valid pickup locations found'
             }, status=400)
         
-        # Calculate optimized route
-        optimized_route, total_distance = RouteOptimizer.nearest_neighbor_tsp(
+        # Calculate optimized route using Google Maps or geodesic fallback
+        route_optimizer = get_route_optimizer(use_google_maps=True)
+        optimized_route, total_distance, estimated_time = route_optimizer.nearest_neighbor_tsp(
             volunteer_location,
             pickup_locations
         )
         
-        # Estimate time
-        estimated_time = RouteOptimizer.estimate_time_minutes(
-            total_distance,
-            stops_count=len(pickup_locations)
-        )
+        # Add stop time to ETA (5 min per stop)
+        estimated_time = int(estimated_time + len(pickup_locations) * 5)
         
         # Build response
         return JsonResponse({
@@ -449,10 +541,26 @@ def calculate_delivery_route(request):
     try:
         volunteer_profile = request.user.volunteer_profile
         
-        if not volunteer_profile.latitude or not volunteer_profile.longitude:
+        # Try to get current GPS location from request body
+        try:
+            body = json.loads(request.body) if request.body else {}
+            current_lat = body.get('current_lat')
+            current_lon = body.get('current_lon')
+        except json.JSONDecodeError:
+            current_lat = None
+            current_lon = None
+        
+        # Use GPS location if available, otherwise fall back to profile location
+        if current_lat and current_lon:
+            volunteer_lat = float(current_lat)
+            volunteer_lon = float(current_lon)
+        elif volunteer_profile.latitude and volunteer_profile.longitude:
+            volunteer_lat = volunteer_profile.latitude
+            volunteer_lon = volunteer_profile.longitude
+        else:
             return JsonResponse({
                 'success': False,
-                'message': 'Please set your location in your profile first'
+                'message': 'Please enable location access or set your location in your profile'
             }, status=400)
         
         # Check if volunteer has collected pickups
@@ -467,16 +575,16 @@ def calculate_delivery_route(request):
                 'message': 'You must collect pickups first'
             }, status=400)
         
-        # Get volunteer's location
+        # Get volunteer's current location (GPS or profile fallback)
         volunteer_location = Location(
-            lat=volunteer_profile.latitude,
-            lon=volunteer_profile.longitude,
+            lat=volunteer_lat,
+            lon=volunteer_lon,
             location_id=0,
             location_type='volunteer',
             name='Your Location'
         )
         
-        # Find nearest active donation camp
+        # Find nearest active donation camp using road distance
         active_camps = DonationCamp.objects.filter(is_active=True).select_related('ngo')
         
         if not active_camps.exists():
@@ -485,39 +593,44 @@ def calculate_delivery_route(request):
                 'message': 'No active donation camps found'
             }, status=400)
         
-        # Find nearest camp
-        nearest_camp = None
-        min_distance = float('inf')
-        
+        # Convert camps to Location objects
+        camp_locations = []
+        camp_map = {}
         for camp in active_camps:
             if camp.latitude and camp.longitude:
-                camp_location = Location(
+                loc = Location(
                     lat=camp.latitude,
                     lon=camp.longitude,
                     location_id=camp.pk,
-                    location_type='camp'
+                    location_type='camp',
+                    name=camp.name
                 )
-                distance = volunteer_location.distance_to(camp_location)
-                if distance < min_distance:
-                    min_distance = distance
-                    nearest_camp = (camp, camp_location)
+                camp_locations.append(loc)
+                camp_map[camp.pk] = camp
         
-        if not nearest_camp:
+        if not camp_locations:
+            return JsonResponse({
+                'success': False,
+                'message': 'No valid donation camps with coordinates found'
+            }, status=400)
+        
+        # Find nearest camp using Google Maps road distance
+        route_optimizer = get_route_optimizer(use_google_maps=True)
+        nearest_loc, total_distance, estimated_time = route_optimizer.find_nearest_location(
+            volunteer_location, camp_locations
+        )
+        
+        if not nearest_loc or nearest_loc.id not in camp_map:
             return JsonResponse({
                 'success': False,
                 'message': 'Could not find a valid delivery location'
             }, status=400)
         
-        camp, camp_location = nearest_camp
+        camp = camp_map[nearest_loc.id]
+        camp_location = nearest_loc
         
         # Calculate route from volunteer to camp
         route = [volunteer_location, camp_location]
-        total_distance = min_distance
-        
-        estimated_time = RouteOptimizer.estimate_time_minutes(
-            total_distance,
-            stops_count=1
-        )
         
         return JsonResponse({
             'success': True,

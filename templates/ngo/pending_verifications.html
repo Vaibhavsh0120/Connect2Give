@@ -1,0 +1,467 @@
+{% extends 'ngo/base.html' %}
+
+{% block title %}Pending Verifications - {{ block.super }}{% endblock %}
+{% block page_title %}Pending Verifications{% endblock %}
+{% block page_description %}Review and verify volunteer deliveries to your donation camps.{% endblock %}
+
+{% block ngo_content %}
+<style>
+    .verification-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 1.5rem;
+    }
+    .verification-stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        text-align: center;
+        border: 1px solid #e5e7eb;
+    }
+    .verification-stat-card.pending {
+        border-left: 4px solid #f59e0b;
+    }
+    .verification-stat-card.verified {
+        border-left: 4px solid #10b981;
+    }
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #111827;
+    }
+    .stat-label {
+        font-size: 0.9rem;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    
+    .verification-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .verification-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 20px;
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .verification-card:hover {
+        border-color: #10b981;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
+    }
+    .verification-card .card-main {
+        flex: 1;
+        min-width: 200px;
+    }
+    .verification-card .card-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 150px;
+    }
+    
+    .volunteer-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+    .volunteer-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: #f3f4f6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        color: #6b7280;
+    }
+    .volunteer-details h4 {
+        margin: 0;
+        font-size: 1rem;
+        color: #111827;
+    }
+    .volunteer-details p {
+        margin: 2px 0 0;
+        font-size: 0.85rem;
+        color: #6b7280;
+    }
+    
+    .donation-details {
+        background: #f9fafb;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-top: 12px;
+    }
+    .donation-details p {
+        margin: 4px 0;
+        font-size: 0.9rem;
+        color: #374151;
+    }
+    .donation-details .label {
+        font-weight: 500;
+        color: #6b7280;
+    }
+    
+    .trust-score-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    .trust-score-badge.high {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    .trust-score-badge.medium {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    .trust-score-badge.low {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .btn-verify {
+        background: #10b981;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+        width: 100%;
+    }
+    .btn-verify:hover {
+        background: #059669;
+    }
+    .btn-verify:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .btn-reject {
+        background: white;
+        color: #dc2626;
+        border: 1px solid #dc2626;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        width: 100%;
+    }
+    .btn-reject:hover {
+        background: #fef2f2;
+    }
+    
+    .verified-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #d1fae5;
+        color: #065f46;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    
+    .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 1.5rem;
+        border-bottom: 2px solid #e5e7eb;
+        padding-bottom: 0;
+    }
+    .tab-btn {
+        padding: 12px 20px;
+        border: none;
+        background: none;
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: #6b7280;
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        transition: all 0.2s;
+    }
+    .tab-btn:hover {
+        color: #374151;
+    }
+    .tab-btn.active {
+        color: #10b981;
+        border-bottom-color: #10b981;
+    }
+    
+    .tab-content {
+        display: none;
+    }
+    .tab-content.active {
+        display: block;
+    }
+</style>
+
+{# Stats Cards #}
+<div class="verification-stats">
+    <div class="verification-stat-card pending">
+        <div class="stat-number">{{ pending_count }}</div>
+        <div class="stat-label">Pending Verifications</div>
+    </div>
+    <div class="verification-stat-card verified">
+        <div class="stat-number">{{ verified_donations|length }}</div>
+        <div class="stat-label">Recently Verified</div>
+    </div>
+</div>
+
+{# Tab Navigation #}
+<div class="tabs">
+    <button class="tab-btn active" onclick="showTab('pending')">Pending ({{ pending_count }})</button>
+    <button class="tab-btn" onclick="showTab('verified')">Recently Verified</button>
+</div>
+
+{# Pending Verifications Tab #}
+<div id="pending-tab" class="tab-content active">
+    <div class="content-card">
+        <h3>Deliveries Awaiting Verification</h3>
+        
+        {% if pending_donations %}
+        <div class="verification-list">
+            {% for donation in pending_donations %}
+            <div class="verification-card" id="verification-card-{{ donation.pk }}">
+                <div class="card-main">
+                    {# Volunteer Info #}
+                    <div class="volunteer-info">
+                        <div class="volunteer-avatar">
+                            {% if donation.assigned_volunteer.profile_picture %}
+                                <img src="{{ donation.assigned_volunteer.profile_picture.url }}" alt="" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                            {% else %}
+                                {{ donation.assigned_volunteer.full_name|slice:":2"|upper }}
+                            {% endif %}
+                        </div>
+                        <div class="volunteer-details">
+                            <h4>{{ donation.assigned_volunteer.full_name }}</h4>
+                            <p>Delivered {{ donation.delivered_at|timesince }} ago</p>
+                        </div>
+                        {% with trust_score=donation.assigned_volunteer.trust_score %}
+                        {% if trust_score %}
+                            <span class="trust-score-badge {% if trust_score.trust_score >= 80 %}high{% elif trust_score.trust_score >= 50 %}medium{% else %}low{% endif %}">
+                                Trust: {{ trust_score.trust_score|floatformat:0 }}%
+                            </span>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                    
+                    {# Donation Details #}
+                    <div class="donation-details">
+                        <p><span class="label">Food:</span> {{ donation.food_description }}</p>
+                        <p><span class="label">Quantity:</span> {{ donation.quantity }} servings</p>
+                        <p><span class="label">From:</span> {{ donation.restaurant.restaurant_name }}</p>
+                        <p><span class="label">Camp:</span> {{ donation.target_camp.name }}</p>
+                    </div>
+                </div>
+                
+                {# Action Buttons #}
+                <div class="card-actions">
+                    <button class="btn-verify" onclick="verifyDonation({{ donation.pk }})" id="verify-btn-{{ donation.pk }}">
+                        Verify & Approve
+                    </button>
+                    <button class="btn-reject" onclick="rejectDonation({{ donation.pk }})" id="reject-btn-{{ donation.pk }}">
+                        Reject
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">No deliveries pending verification. All caught up!</p>
+        {% endif %}
+    </div>
+</div>
+
+{# Recently Verified Tab #}
+<div id="verified-tab" class="tab-content">
+    <div class="content-card">
+        <h3>Recently Verified Deliveries</h3>
+        
+        {% if verified_donations %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Volunteer</th>
+                    <th>Food Description</th>
+                    <th>From</th>
+                    <th>Camp</th>
+                    <th>Verified</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for donation in verified_donations %}
+                <tr>
+                    <td data-label="Volunteer">{{ donation.assigned_volunteer.full_name }}</td>
+                    <td data-label="Food">{{ donation.food_description }}</td>
+                    <td data-label="From">{{ donation.restaurant.restaurant_name }}</td>
+                    <td data-label="Camp">{{ donation.target_camp.name }}</td>
+                    <td data-label="Verified">
+                        <span class="verified-badge">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            {{ donation.verified_at|timesince }} ago
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state">No verified deliveries yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock ngo_content %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+    function showTab(tabName) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Show selected tab
+        document.getElementById(tabName + '-tab').classList.add('active');
+        event.target.classList.add('active');
+    }
+    
+    function verifyDonation(donationId) {
+        const btn = document.getElementById('verify-btn-' + donationId);
+        btn.disabled = true;
+        btn.textContent = 'Verifying...';
+        
+        fetch('/donation/verify/' + donationId + '/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message || 'Donation verified successfully!', 'success');
+                
+                // Remove card with animation
+                const card = document.getElementById('verification-card-' + donationId);
+                if (card) {
+                    card.style.transition = 'opacity 0.3s, transform 0.3s';
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateX(20px)';
+                    setTimeout(() => {
+                        card.remove();
+                        updatePendingCount();
+                    }, 300);
+                }
+            } else {
+                showToast(data.message || 'Failed to verify donation', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Verify & Approve';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('An error occurred. Please try again.', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Verify & Approve';
+        });
+    }
+    
+    function rejectDonation(donationId) {
+        const reason = prompt('Please provide a reason for rejection (optional):');
+        if (reason === null) return; // User cancelled
+        
+        const btn = document.getElementById('reject-btn-' + donationId);
+        btn.disabled = true;
+        btn.textContent = 'Rejecting...';
+        
+        const formData = new FormData();
+        formData.append('reason', reason);
+        
+        fetch('/donation/reject/' + donationId + '/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message || 'Donation rejected. Volunteer can re-deliver.', 'warning');
+                
+                // Remove card with animation
+                const card = document.getElementById('verification-card-' + donationId);
+                if (card) {
+                    card.style.transition = 'opacity 0.3s, transform 0.3s';
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateX(-20px)';
+                    setTimeout(() => {
+                        card.remove();
+                        updatePendingCount();
+                    }, 300);
+                }
+            } else {
+                showToast(data.message || 'Failed to reject donation', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Reject';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('An error occurred. Please try again.', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Reject';
+        });
+    }
+    
+    function updatePendingCount() {
+        const cards = document.querySelectorAll('#pending-tab .verification-card');
+        const count = cards.length;
+        
+        // Update stat card
+        const statNumber = document.querySelector('.verification-stat-card.pending .stat-number');
+        if (statNumber) statNumber.textContent = count;
+        
+        // Update tab button
+        const tabBtn = document.querySelector('.tab-btn.active');
+        if (tabBtn && tabBtn.textContent.includes('Pending')) {
+            tabBtn.textContent = 'Pending (' + count + ')';
+        }
+        
+        // Show empty state if no more pending
+        if (count === 0) {
+            const list = document.querySelector('#pending-tab .verification-list');
+            if (list) {
+                list.innerHTML = '<p class="empty-state">No deliveries pending verification. All caught up!</p>';
+            }
+        }
+    }
+</script>
+{% endblock scripts %}

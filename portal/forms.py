@@ -100,6 +100,26 @@ class VolunteerProfileForm(forms.ModelForm):
     """
     A form for Volunteers to edit their profile information.
     """
+    # Pre-defined skill choices for volunteers
+    SKILL_CHOICES = [
+        ('', 'Select your skills...'),
+        ('driving', 'Driving'),
+        ('first_aid', 'First Aid'),
+        ('cooking', 'Cooking'),
+        ('logistics', 'Logistics'),
+        ('communication', 'Communication'),
+        ('medical', 'Medical'),
+        ('packaging', 'Packaging'),
+        ('other', 'Other'),
+    ]
+    
+    skills = forms.MultipleChoiceField(
+        choices=SKILL_CHOICES[1:],  # Exclude placeholder
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'skill-checkbox'}),
+        required=False,
+        label='Skills'
+    )
+    
     class Meta:
         model = VolunteerProfile
         fields = [
@@ -114,15 +134,39 @@ class VolunteerProfileForm(forms.ModelForm):
         labels = {
             'full_name': 'Full Name',
             'phone_number': 'Phone Number',
-            'skills': 'Skills (e.g., Driving, First Aid)',
+            'skills': 'Skills',
             'address': 'Your Primary Address',
             'profile_picture': 'Profile Picture',
         }
         widgets = {
             'latitude': forms.HiddenInput(),
             'longitude': forms.HiddenInput(),
-            'address': forms.Textarea(attrs={'rows': 3}),
+            'address': forms.Textarea(attrs={'rows': 3, 'id': 'id_address'}),
         }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Convert stored skills string to list for initial value
+        if self.instance and self.instance.skills:
+            skills_list = [s.strip().lower().replace(' ', '_') for s in self.instance.skills.split(',')]
+            self.initial['skills'] = skills_list
+    
+    def clean_skills(self):
+        """Convert skills list back to comma-separated string for storage"""
+        skills = self.cleaned_data.get('skills', [])
+        # Convert skill codes to readable names
+        skill_map = {
+            'driving': 'Driving',
+            'first_aid': 'First Aid',
+            'cooking': 'Cooking',
+            'logistics': 'Logistics',
+            'communication': 'Communication',
+            'medical': 'Medical',
+            'packaging': 'Packaging',
+            'other': 'Other',
+        }
+        readable_skills = [skill_map.get(s, s) for s in skills if s]
+        return ', '.join([s for s in readable_skills if s is not None])
     
     def clean_full_name(self):
         """Validate that full_name contains only alphabetic characters and spaces"""
