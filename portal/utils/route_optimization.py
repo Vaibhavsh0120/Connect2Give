@@ -10,7 +10,7 @@ from geopy.distance import geodesic
 
 class Location:
     """Represents a geographic location with coordinates and metadata"""
-    def __init__(self, lat: float, lon: float, location_id: int = None, location_type: str = 'donation', name: str = ''):
+    def __init__(self, lat: float, lon: float, location_id: int | None = None, location_type: str = 'donation', name: str = ''):
         self.lat = lat
         self.lon = lon
         self.id = location_id
