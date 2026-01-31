@@ -1,10 +1,15 @@
 # portal/views/auth_views.py
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.messages import get_messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.conf import settings
 from ..models import User, RestaurantProfile, NGOProfile, VolunteerProfile
 
 def get_user_dashboard_redirect(user):
