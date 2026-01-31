@@ -315,6 +315,37 @@ def accept_donation(request, donation_id):
 
 @login_required(login_url='login_page')
 @user_type_required('VOLUNTEER')
+def cancel_pickup(request, donation_id):
+    """Cancel a pickup - reset donation status to PENDING"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid request.'}, status=400)
+    
+    try:
+        donation = get_object_or_404(Donation, pk=donation_id)
+        
+        # Verify this volunteer owns the pickup
+        if donation.assigned_volunteer != request.user.volunteer_profile:
+            return JsonResponse({'success': False, 'message': 'Unauthorized.'}, status=403)
+        
+        # Only allow cancellation for ACCEPTED or COLLECTED status
+        if donation.status not in ['ACCEPTED', 'COLLECTED']:
+            return JsonResponse({'success': False, 'message': 'Cannot cancel donation in current status.'}, status=400)
+        
+        # Reset donation to PENDING
+        donation.status = 'PENDING'
+        donation.assigned_volunteer = None
+        donation.accepted_at = None
+        donation.collected_at = None
+        donation.save()
+        
+        return JsonResponse({'success': True, 'message': 'Pickup cancelled. The donation is now available for other volunteers.'})
+    except Exception as e:
+        print(f"Error in cancel_pickup: {e}")
+        return JsonResponse({'success': False, 'message': 'An error occurred.'}, status=500)
+
+
+@login_required(login_url='login_page')
+@user_type_required('VOLUNTEER')
 def mark_as_collected(request, donation_id):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Invalid request.'}, status=400)

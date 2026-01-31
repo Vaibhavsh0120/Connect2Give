@@ -6,6 +6,97 @@
 {% block page_description %}Update your public information and location.{% endblock %}
 
 {% block volunteer_content %}
+<style>
+    /* Skills display styles */
+    .skills-display-container {
+        margin-top: 0.5rem;
+    }
+    
+    .skills-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .skill-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.5rem 0.875rem;
+        background: var(--accent-primary-light, rgba(0, 173, 181, 0.1));
+        color: var(--accent-primary, #00adb5);
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    
+    .skill-badge .check-icon {
+        width: 14px;
+        height: 14px;
+        color: var(--accent-green, #28a745);
+    }
+    
+    .no-skills-text {
+        color: var(--text-muted, #6c757d);
+        font-style: italic;
+    }
+    
+    /* Skills edit mode */
+    .skills-edit-container {
+        display: none;
+    }
+    
+    .skills-checkbox-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    
+    .skill-checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-card-hover, #f8f9fa);
+        border: 1px solid var(--border, #dee2e6);
+        border-radius: var(--radius, 0.5rem);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .skill-checkbox-item:hover {
+        border-color: var(--accent-primary, #00adb5);
+    }
+    
+    .skill-checkbox-item input[type="checkbox"] {
+        width: auto;
+        margin: 0;
+    }
+    
+    .skill-checkbox-item input[type="checkbox"]:checked + .skill-label {
+        color: var(--accent-primary, #00adb5);
+        font-weight: 600;
+    }
+    
+    .skill-checkbox-item:has(input:checked) {
+        background: var(--accent-primary-light, rgba(0, 173, 181, 0.1));
+        border-color: var(--accent-primary, #00adb5);
+    }
+    
+    .skill-label {
+        font-size: 0.875rem;
+    }
+    
+    /* Edit mode active state */
+    body.edit-mode .skills-display-container {
+        display: none;
+    }
+    
+    body.edit-mode .skills-edit-container {
+        display: block;
+    }
+</style>
+
 <div class="profile-container">
     <div class="profile-form">
         <form method="POST" enctype="multipart/form-data" action="{% url 'volunteer_profile' %}" id="profile-form">
@@ -31,9 +122,64 @@
                         {{ form.phone_number.label_tag }}
                         {{ form.phone_number }}
                     </div>
+                    
+                    <!-- Skills Section with View/Edit Mode -->
                     <div class="form-group">
-                        {{ form.skills.label_tag }}
-                        {{ form.skills }}
+                        <label>Skills</label>
+                        
+                        <!-- View Mode: Show only selected skills as badges -->
+                        <div class="skills-display-container" id="skills-display">
+                            <div class="skills-badges">
+                                {% if form.instance.skills %}
+                                    {% for skill in form.instance.skills.split %}
+                                        {% if skill %}
+                                        <span class="skill-badge">
+                                            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="20 6 9 17 4 12"/>
+                                            </svg>
+                                            {{ skill|cut:"," }}
+                                        </span>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="no-skills-text">No skills added yet. Click Edit to add your skills.</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Edit Mode: Show all skills as checkboxes -->
+                        <div class="skills-edit-container" id="skills-edit">
+                            <div class="skills-checkbox-group">
+                                <label class="skill-checkbox-item">
+                                    <input type="checkbox" name="skills" value="driving" {% if 'Driving' in form.instance.skills %}checked{% endif %}>
+                                    <span class="skill-label">Driving</span>
+                                </label>
+                                <label class="skill-checkbox-item">
+                                    <input type="checkbox" name="skills" value="first_aid" {% if 'First Aid' in form.instance.skills %}checked{% endif %}>
+                                    <span class="skill-label">First Aid</span>
+                                </label>
+                                <label class="skill-checkbox-item">
+                                    <input type="checkbox" name="skills" value="cooking" {% if 'Cooking' in form.instance.skills %}checked{% endif %}>
+                                    <span class="skill-label">Cooking</span>
+                                </label>
+                                <label class="skill-checkbox-item">
+                                    <input type="checkbox" name="skills" value="logistics" {% if 'Logistics' in form.instance.skills %}checked{% endif %}>
+                                    <span class="skill-label">Logistics</span>
+                                </label>
+                                <label class="skill-checkbox-item">
+                                    <input type="checkbox" name="skills" value="communication" {% if 'Communication' in form.instance.skills %}checked{% endif %}>
+                                    <span class="skill-label">Communication</span>
+                                </label>
+                                <label class="skill-checkbox-item">
+                                    <input type="checkbox" name="skills" value="medical" {% if 'Medical' in form.instance.skills %}checked{% endif %}>
+                                    <span class="skill-label">Medical</span>
+                                </label>
+                                <label class="skill-checkbox-item">
+                                    <input type="checkbox" name="skills" value="packaging" {% if 'Packaging' in form.instance.skills %}checked{% endif %}>
+                                    <span class="skill-label">Packaging</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -240,15 +386,25 @@
         const saveBtn = document.getElementById('save-changes-btn');
         const imageUploadBtns = document.querySelectorAll('.image-upload-btn');
         const mapActionBtns = document.querySelectorAll('.map-action-btn');
+        const skillsDisplay = document.getElementById('skills-display');
+        const skillsEdit = document.getElementById('skills-edit');
 
         // Disable form fields by default
         function setReadOnlyMode() {
+            document.body.classList.remove('edit-mode');
+            
             // Disable all input fields except hidden ones
-            const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="file"]), textarea, select');
+            const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]), textarea, select');
             inputs.forEach(input => {
                 input.setAttribute('readonly', 'readonly');
                 input.style.pointerEvents = 'none';
                 input.style.backgroundColor = '#f9fafb';
+            });
+            
+            // Disable checkboxes
+            const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                cb.disabled = true;
             });
 
             // Hide image upload buttons
@@ -267,11 +423,19 @@
 
         // Enable edit mode
         window.enableEditMode = function() {
-            const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="file"]), textarea, select');
+            document.body.classList.add('edit-mode');
+            
+            const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]), textarea, select');
             inputs.forEach(input => {
                 input.removeAttribute('readonly');
                 input.style.pointerEvents = 'auto';
                 input.style.backgroundColor = 'white';
+            });
+            
+            // Enable checkboxes
+            const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                cb.disabled = false;
             });
 
             // Show image upload buttons

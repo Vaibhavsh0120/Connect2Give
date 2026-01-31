@@ -121,22 +121,17 @@ def ngo_settings(request):
 @login_required(login_url='login_page')
 @user_type_required('NGO')
 def ngo_register_volunteer(request):
-    """NGO portal to register new volunteers"""
+    """NGO portal to register new volunteers with comprehensive details"""
     ngo_profile = request.user.ngo_profile
     
     if request.method == 'POST':
-        form = NGORegisterVolunteerForm(request.POST)
+        form = NGORegisterVolunteerForm(request.POST, request.FILES)
         if form.is_valid():
             # Generate temporary password
             temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
             
-            # Create unique username
-            base_username = form.cleaned_data['email'].split('@')[0]
-            username = base_username
-            counter = 1
-            while User.objects.filter(username=username).exists():
-                username = f"{base_username}{counter}"
-                counter += 1
+            # Use the explicitly provided username (validated in form)
+            username = form.cleaned_data['username']
             
             # Create user
             try:
@@ -150,15 +145,24 @@ def ngo_register_volunteer(request):
                     must_change_password=True  # Force password change
                 )
                 
-                # Create volunteer profile
+                # Create volunteer profile with all fields
                 volunteer_profile = VolunteerProfile.objects.create(
                     user=user,
                     full_name=form.cleaned_data['full_name'],
                     email=form.cleaned_data['email'],
                     phone_number=form.cleaned_data['phone_number'],
                     aadhar_number=form.cleaned_data['aadhar_number'],
+                    skills=form.cleaned_data.get('skills', ''),
+                    address=form.cleaned_data.get('address', ''),
+                    latitude=form.cleaned_data.get('latitude'),
+                    longitude=form.cleaned_data.get('longitude'),
                     registered_ngo=ngo_profile
                 )
+                
+                # Handle profile picture upload
+                if form.cleaned_data.get('profile_picture'):
+                    volunteer_profile.profile_picture = form.cleaned_data['profile_picture']
+                    volunteer_profile.save()
                 
                 # Add to NGO's volunteers
                 NGOVolunteer.objects.create(ngo=ngo_profile, volunteer=volunteer_profile)

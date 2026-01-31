@@ -16,7 +16,6 @@
         <div class="tab-navigation">
             <button class="tab-button {% if not active_tab %}active{% endif %}" onclick="switchTab(event, 'create-camp')">Create Camp</button>
             <button class="tab-button {% if active_tab == 'history' %}active{% endif %}" onclick="switchTab(event, 'camps-history')">Camps History</button>
-            <button class="tab-button {% if active_tab == 'verification' %}active{% endif %}" onclick="switchTab(event, 'donation-verification')">Donation Verification</button>
         </div>
 
         <div id="create-camp" class="tab-content {% if not active_tab %}active{% endif %}">
@@ -145,44 +144,6 @@
             </div>
         </div>
 
-        <div id="donation-verification" class="tab-content {% if active_tab == 'verification' %}active{% endif %}">
-            <div class="content-card">
-                <h3 style="margin-bottom: 1.5rem; color: var(--text-primary);">Donations Pending Verification</h3>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Restaurant</th>
-                            <th>Food Description</th>
-                            <th>Volunteer</th>
-                            <th>Delivered To</th>
-                            <th>Delivered At</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for donation in donations_to_verify %}
-                        <tr>
-                            <td data-label="Restaurant"><strong>{{ donation.restaurant.restaurant_name }}</strong></td>
-                            <td data-label="Food Description">{{ donation.food_description }}</td>
-                            <td data-label="Volunteer">{{ donation.assigned_volunteer.full_name }}</td>
-                            <td data-label="Delivered To">{{ donation.target_camp.name }}</td>
-                            <td data-label="Delivered At">{{ donation.delivered_at|date:"d M Y, H:i" }}</td>
-                            <td data-label="Action">
-                                <form action="{% url 'confirm_delivery' donation.pk %}" method="POST" style="display:inline;">
-                                    {% csrf_token %}
-                                    <button type="submit" class="action-button">Confirm Delivery</button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="6" class="empty-state">There are no deliveries awaiting your verification.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
     </div>
 
     <div id="ratingModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">

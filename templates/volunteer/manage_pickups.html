@@ -254,6 +254,26 @@
         cursor: not-allowed;
     }
     
+    .btn-cancel {
+        background: #f3f4f6;
+        color: #ef4444;
+        border: 1px solid #fecaca;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+    }
+    .btn-cancel:hover {
+        background: #fef2f2;
+        border-color: #ef4444;
+    }
+    .btn-cancel:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
     .btn-primary-action {
         background: #10b981;
         color: white;
@@ -451,13 +471,19 @@
                     <p class="address-text">{{ donation.pickup_address }}</p>
                 </div>
             </div>
-            <div class="pickup-item-status">
+            <div class="pickup-item-status" style="display: flex; gap: 8px; align-items: center;">
                 {% if donation.status == 'ACCEPTED' %}
                     <button class="btn-collect" id="collect-btn-{{ donation.pk }}" onclick="markAsCollected({{ donation.pk }})">
                         Mark as Collected
                     </button>
+                    <button class="btn-cancel" id="cancel-btn-{{ donation.pk }}" onclick="cancelPickup({{ donation.pk }})" title="Cancel this pickup">
+                        Cancel
+                    </button>
                 {% elif donation.status == 'COLLECTED' %}
                     <span class="status-badge status-collected">Collected</span>
+                    <button class="btn-cancel" id="cancel-btn-{{ donation.pk }}" onclick="cancelPickup({{ donation.pk }})" title="Cancel this pickup">
+                        Cancel
+                    </button>
                 {% endif %}
             </div>
         </div>
@@ -969,10 +995,6 @@
         ], { padding: [50, 50] });
     }
     
-    // Cleanup on page unload
-    window.addEventListener('beforeunload', function() {
-            navigator.geolocation.clearWatch(locationWatchId);
-        }
-    });
+    // Note: Cleanup handled in volunteer_pickups.js
 </script>
 {% endblock scripts %}

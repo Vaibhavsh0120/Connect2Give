@@ -7,6 +7,8 @@
 {% block page_description %}Recruit volunteers to support food donation pickups and deliveries{% endblock %}
 
 {% block ngo_content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
 <div class="register-volunteer-page">
     <!-- Back navigation link -->
     <a href="{% url 'ngo_manage_volunteers' %}" class="back-link">
@@ -19,74 +21,175 @@
     <!-- Volunteer registration form card -->
     <div class="content-card volunteer-form-card">
         <h3>Volunteer Details</h3>
-        <form action="{% url 'ngo_register_volunteer' %}" method="POST" class="volunteer-form">
+        <form action="{% url 'ngo_register_volunteer' %}" method="POST" enctype="multipart/form-data" class="volunteer-form">
             {% csrf_token %}
             
-            <div class="form-group">
-                <label for="id_full_name">
-                    Full Name <span class="required">*</span>
-                </label>
-                <input 
-                    type="text" 
-                    name="full_name" 
-                    id="id_full_name" 
-                    placeholder="John Doe"
-                    required
-                >
-                {% if form.full_name.errors %}
-                    <p class="field-error">{{ form.full_name.errors.0 }}</p>
-                {% endif %}
-                <p class="form-help-text">Alphabetic characters and spaces only</p>
+            <!-- Hidden fields for location -->
+            <input type="hidden" name="latitude" id="id_volunteer_latitude">
+            <input type="hidden" name="longitude" id="id_volunteer_longitude">
+            
+            <div class="form-row">
+                <!-- Left Column: Basic Info -->
+                <div class="form-column">
+                    <div class="form-group">
+                        <label for="id_full_name">
+                            Full Name <span class="required">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            name="full_name" 
+                            id="id_full_name" 
+                            placeholder="John Doe"
+                            required
+                        >
+                        {% if form.full_name.errors %}
+                            <p class="field-error">{{ form.full_name.errors.0 }}</p>
+                        {% endif %}
+                        <p class="form-help-text">Alphabetic characters and spaces only</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_username">
+                            Username <span class="required">*</span>
+                        </label>
+                        <div class="username-input-group">
+                            <input 
+                                type="text" 
+                                name="username" 
+                                id="id_username" 
+                                placeholder="volunteer_username"
+                                autocomplete="off"
+                                required
+                            >
+                            <button type="button" class="btn-check-username" onclick="checkUsernameAvailability()">
+                                Check
+                            </button>
+                        </div>
+                        {% if form.username.errors %}
+                            <p class="field-error">{{ form.username.errors.0 }}</p>
+                        {% endif %}
+                        <p class="form-help-text" id="username-status">Unique username for login (letters, numbers, underscores, hyphens)</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_email">
+                            Email Address <span class="required">*</span>
+                        </label>
+                        <input 
+                            type="email" 
+                            name="email" 
+                            id="id_email" 
+                            placeholder="volunteer@example.com"
+                            required
+                        >
+                        {% if form.email.errors %}
+                            <p class="field-error">{{ form.email.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_phone_number">
+                            Phone Number <span class="required">*</span>
+                        </label>
+                        <input 
+                            type="tel" 
+                            name="phone_number" 
+                            id="id_phone_number" 
+                            placeholder="+91 98765 43210"
+                            required
+                        >
+                        {% if form.phone_number.errors %}
+                            <p class="field-error">{{ form.phone_number.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_aadhar_number">
+                            Aadhar Card Number <span class="required">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            name="aadhar_number" 
+                            id="id_aadhar_number" 
+                            placeholder="123456789012"
+                            required
+                            maxlength="12"
+                        >
+                        {% if form.aadhar_number.errors %}
+                            <p class="field-error">{{ form.aadhar_number.errors.0 }}</p>
+                        {% endif %}
+                        <p class="form-help-text">Required for verification (12 digits)</p>
+                    </div>
+                </div>
+                
+                <!-- Right Column: Profile Picture & Skills -->
+                <div class="form-column">
+                    <div class="form-group">
+                        <label>Profile Picture (Optional)</label>
+                        <div class="profile-upload-container">
+                            <div class="profile-preview">
+                                <img src="https://placehold.co/120x120/e2e8f0/475569?text=Photo" alt="Profile Preview" id="profile-preview-img">
+                            </div>
+                            <input type="file" name="profile_picture" id="id_profile_picture" accept="image/*" style="display: none;">
+                            <button type="button" class="btn-upload" onclick="document.getElementById('id_profile_picture').click()">
+                                Choose Photo
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Skills</label>
+                        <div class="skills-checkbox-group">
+                            <label class="skill-checkbox-item">
+                                <input type="checkbox" name="skills" value="driving">
+                                <span class="skill-label">Driving</span>
+                            </label>
+                            <label class="skill-checkbox-item">
+                                <input type="checkbox" name="skills" value="first_aid">
+                                <span class="skill-label">First Aid</span>
+                            </label>
+                            <label class="skill-checkbox-item">
+                                <input type="checkbox" name="skills" value="cooking">
+                                <span class="skill-label">Cooking</span>
+                            </label>
+                            <label class="skill-checkbox-item">
+                                <input type="checkbox" name="skills" value="logistics">
+                                <span class="skill-label">Logistics</span>
+                            </label>
+                            <label class="skill-checkbox-item">
+                                <input type="checkbox" name="skills" value="communication">
+                                <span class="skill-label">Communication</span>
+                            </label>
+                            <label class="skill-checkbox-item">
+                                <input type="checkbox" name="skills" value="medical">
+                                <span class="skill-label">Medical</span>
+                            </label>
+                            <label class="skill-checkbox-item">
+                                <input type="checkbox" name="skills" value="packaging">
+                                <span class="skill-label">Packaging</span>
+                            </label>
+                        </div>
+                        <p class="form-help-text">Select applicable skills</p>
+                    </div>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label for="id_email">
-                    Email Address <span class="required">*</span>
-                </label>
-                <input 
-                    type="email" 
-                    name="email" 
-                    id="id_email" 
-                    placeholder="volunteer@example.com"
-                    required
-                >
-                {% if form.email.errors %}
-                    <p class="field-error">{{ form.email.errors.0 }}</p>
-                {% endif %}
-            </div>
-
-            <div class="form-group">
-                <label for="id_phone_number">
-                    Phone Number <span class="required">*</span>
-                </label>
-                <input 
-                    type="tel" 
-                    name="phone_number" 
-                    id="id_phone_number" 
-                    placeholder="+91 98765 43210"
-                    required
-                >
-                {% if form.phone_number.errors %}
-                    <p class="field-error">{{ form.phone_number.errors.0 }}</p>
-                {% endif %}
-            </div>
-
-            <div class="form-group">
-                <label for="id_aadhar_number">
-                    Aadhar Card Number <span class="required">*</span>
-                </label>
-                <input 
-                    type="text" 
-                    name="aadhar_number" 
-                    id="id_aadhar_number" 
-                    placeholder="123456789012"
-                    required
-                    maxlength="12"
-                >
-                {% if form.aadhar_number.errors %}
-                    <p class="field-error">{{ form.aadhar_number.errors.0 }}</p>
-                {% endif %}
-                <p class="form-help-text">Required for verification (12 digits)</p>
+            <!-- Address Section with Map -->
+            <div class="form-group address-section">
+                <label for="id_volunteer_address">Primary Address</label>
+                <div class="address-input-group">
+                    <textarea 
+                        name="address" 
+                        id="id_volunteer_address" 
+                        rows="3" 
+                        placeholder="Enter volunteer's primary address..."
+                    ></textarea>
+                    <div class="address-buttons">
+                        <button type="button" class="btn-map-action" onclick="findAddressOnMap()">Find on Map</button>
+                    </div>
+                </div>
+                <div id="volunteer-location-map"></div>
+                <p class="form-help-text">Click on the map or search to set location</p>
             </div>
 
             <button type="submit" class="btn submit-btn">
@@ -142,6 +245,18 @@
         gap: 1.25rem;
     }
 
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+    }
+
+    .form-column {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
     .required {
         color: var(--accent-red);
     }
@@ -153,8 +268,156 @@
         margin-bottom: 0;
     }
 
+    /* Username input group */
+    .username-input-group {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .username-input-group input {
+        flex: 1;
+    }
+
+    .btn-check-username {
+        padding: 0.5rem 1rem;
+        background: var(--bg-card-hover);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-size: 0.875rem;
+        white-space: nowrap;
+    }
+
+    .btn-check-username:hover {
+        background: var(--border-light);
+    }
+
+    #username-status.available {
+        color: var(--accent-green);
+    }
+
+    #username-status.unavailable {
+        color: var(--accent-red);
+    }
+
+    /* Profile upload */
+    .profile-upload-container {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .profile-preview {
+        width: 100px;
+        height: 100px;
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 2px solid var(--border);
+    }
+
+    .profile-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .btn-upload {
+        padding: 0.5rem 1rem;
+        background: var(--accent-primary-light);
+        color: var(--accent-primary);
+        border: 1px solid var(--accent-primary);
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-size: 0.875rem;
+    }
+
+    .btn-upload:hover {
+        background: var(--accent-primary);
+        color: white;
+    }
+
+    /* Skills checkbox group */
+    .skills-checkbox-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .skill-checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-card-hover);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .skill-checkbox-item:hover {
+        border-color: var(--accent-primary);
+    }
+
+    .skill-checkbox-item input[type="checkbox"] {
+        width: auto;
+        margin: 0;
+    }
+
+    .skill-checkbox-item input[type="checkbox"]:checked + .skill-label {
+        color: var(--accent-primary);
+        font-weight: 600;
+    }
+
+    .skill-checkbox-item:has(input:checked) {
+        background: var(--accent-primary-light);
+        border-color: var(--accent-primary);
+    }
+
+    .skill-label {
+        font-size: 0.875rem;
+    }
+
+    /* Address section */
+    .address-section {
+        margin-top: 1rem;
+    }
+
+    .address-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .address-buttons {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-map-action {
+        padding: 0.5rem 1rem;
+        background: var(--accent-primary);
+        color: white;
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-size: 0.875rem;
+    }
+
+    .btn-map-action:hover {
+        background: var(--accent-primary-hover);
+    }
+
+    #volunteer-location-map {
+        height: 300px;
+        width: 100%;
+        border-radius: var(--radius);
+        margin-top: 0.75rem;
+        border: 1px solid var(--border);
+    }
+
     .submit-btn {
-        margin-top: 0.5rem;
+        margin-top: 1rem;
     }
 
     .info-note {
@@ -184,6 +447,117 @@
         .back-link {
             margin-bottom: 1rem;
         }
+
+        .form-row {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
     }
 </style>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Profile picture preview
+    document.getElementById('id_profile_picture').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                document.getElementById('profile-preview-img').src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Initialize map
+    const map = L.map('volunteer-location-map', {
+        zoomControl: true,
+        attributionControl: false
+    }).setView([28.6139, 77.2090], 11);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    let marker = null;
+    const latField = document.getElementById('id_volunteer_latitude');
+    const lonField = document.getElementById('id_volunteer_longitude');
+    const addressField = document.getElementById('id_volunteer_address');
+
+    function updateMarkerAndFields(lat, lon, address = null) {
+        latField.value = lat;
+        lonField.value = lon;
+        if (address) {
+            addressField.value = address;
+        }
+        if (marker) {
+            marker.setLatLng([lat, lon]);
+        } else {
+            marker = L.marker([lat, lon]).addTo(map);
+        }
+        map.setView([lat, lon], 15);
+    }
+
+    map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lon = e.latlng.lng;
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+            .then(response => response.json())
+            .then(data => {
+                const address = data.display_name || 'Location selected';
+                updateMarkerAndFields(lat, lon, address);
+            });
+    });
+
+    window.findAddressOnMap = function() {
+        const address = addressField.value;
+        if (!address) {
+            alert('Please enter an address to find.');
+            return;
+        }
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.length > 0) {
+                    const lat = data[0].lat;
+                    const lon = data[0].lon;
+                    updateMarkerAndFields(lat, lon);
+                } else {
+                    alert('Address not found.');
+                }
+            });
+    };
+});
+
+// Check username availability
+function checkUsernameAvailability() {
+    const usernameInput = document.getElementById('id_username');
+    const statusEl = document.getElementById('username-status');
+    const username = usernameInput.value.trim().toLowerCase();
+    
+    if (!username || username.length < 3) {
+        statusEl.textContent = 'Username must be at least 3 characters';
+        statusEl.className = 'form-help-text unavailable';
+        return;
+    }
+    
+    statusEl.textContent = 'Checking...';
+    statusEl.className = 'form-help-text';
+    
+    fetch(`/api/check-username/?username=${encodeURIComponent(username)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.available) {
+                statusEl.textContent = 'Username is available';
+                statusEl.className = 'form-help-text available';
+            } else {
+                statusEl.textContent = data.message || 'Username is already taken';
+                statusEl.className = 'form-help-text unavailable';
+            }
+        })
+        .catch(error => {
+            statusEl.textContent = 'Error checking username';
+            statusEl.className = 'form-help-text unavailable';
+        });
+}
+</script>
 {% endblock %}

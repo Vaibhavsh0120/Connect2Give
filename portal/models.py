@@ -66,7 +66,17 @@ class NGOProfile(models.Model):
     address = models.TextField()
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
-    contact_person = models.CharField(max_length=100, validators=[alphabetic_validator])
+    contact_number = models.CharField(
+        max_length=10, 
+        validators=[
+            RegexValidator(
+                regex=r'^\d{10}$',
+                message='Contact number must be exactly 10 digits.',
+                code='invalid_contact_number'
+            )
+        ],
+        help_text="10-digit mobile number"
+    )
     profile_picture = models.ImageField(upload_to='profile_pictures/ngos/', null=True, blank=True)
     banner_image = models.ImageField(upload_to='banner_images/ngos/', null=True, blank=True)
     volunteers = models.ManyToManyField('VolunteerProfile', through='NGOVolunteer', related_name='registered_ngos')

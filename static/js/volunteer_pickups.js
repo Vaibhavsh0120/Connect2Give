@@ -1,14 +1,24 @@
 /**
  * Volunteer Pickups & Delivery Management
  * Handles donation acceptance, delivery routing, live tracking, and map display
+ * 
+ * ARCHITECTURE:
+ * - Pickup Map (Mode A): Multi-stop TSP route from volunteer -> restaurants
+ * - Delivery Map (Mode B): Simple route from volunteer -> nearest camp
+ * Both maps use separate instances to avoid conflicts
  */
 
+// ============ GLOBAL STATE ============
+let pickupMapInstance = null;
 let deliveryMapInstance = null;
+let pickupRoutingControl = null;
+let deliveryRoutingControl = null;
+let volunteerPickupMarker = null;
+let volunteerDeliveryMarker = null;
 let liveTrackingWatchId = null;
-let volunteerMarker = null;
-let routePolyline = null;
+let currentVolunteerPosition = null;
 
-// Custom bike/scooter icon for volunteer marker
+// ============ CUSTOM ICONS ============
 const bikeIcon = L.divIcon({
     className: 'volunteer-marker',
     html: `<div style="
@@ -30,175 +40,408 @@ const bikeIcon = L.divIcon({
     popupAnchor: [0, -18]
 });
 
-/**
- * Initialize the page when DOM is ready
- */
+const campIcon = L.divIcon({
+    className: 'camp-marker',
+    html: `<div style="
+        width: 36px; height: 36px; 
+        background: #ef4444; 
+        border-radius: 50%; 
+        border: 3px solid white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        display: flex; align-items: center; justify-content: center;
+    ">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+    </div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -18]
+});
+
+// Create numbered restaurant icon
+function createRestaurantIcon(number) {
+    return L.divIcon({
+        className: 'restaurant-marker',
+        html: `<div style="
+            width: 32px; height: 32px; 
+            background: #3b82f6; 
+            border-radius: 50%; 
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 700; font-size: 14px;
+        ">${number}</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16]
+    });
+}
+
+// ============ PAGE INITIALIZATION ============
 document.addEventListener('DOMContentLoaded', function () {
     const currentView = document.body.dataset.currentView || '';
     
     if (currentView === "delivery_route") {
-        initializeDeliveryRouteMap();
+        // Initialize delivery map after a short delay to ensure container is visible
+        setTimeout(() => {
+            initializeDeliveryMap();
+        }, 100);
     }
-
-    // Tab navigation from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('view') === 'history') {
-        const mainContent = document.getElementById('main-content');
-        const historyContent = document.getElementById('history');
-        
-        if (mainContent) mainContent.classList.remove('active');
-        if (historyContent) historyContent.classList.add('active');
-    }
+    
+    // Start live location tracking for both modes
+    startLiveLocationTracking();
 });
 
+// ============ PICKUP MAP (Mode A - Multi-stop TSP) ============
+
 /**
- * Initialize the delivery route map with Leaflet, routing, and live tracking
+ * Calculate and display optimized pickup route
+ * Called when user clicks "Calculate Best Route" button
  */
-function initializeDeliveryRouteMap() {
-    const volunteerDataElement = document.getElementById('volunteer-location-data');
-    const campDataElement = document.getElementById('nearest-camp-data');
-    const mapContainer = document.getElementById('delivery-map');
-
-    if (!volunteerDataElement || !mapContainer || !campDataElement) {
-        if (mapContainer) {
-            mapContainer.innerHTML = '<p class="empty-state">Cannot display route due to missing location data. Please set your location in your profile.</p>';
-        }
-        return;
-    }
-
-    if (typeof L === 'undefined' || typeof L.Routing === 'undefined') {
-        mapContainer.innerHTML = '<p class="empty-state">Error: Mapping library failed to load. Please refresh the page.</p>';
-        return;
-    }
-
-    const volunteerData = JSON.parse(volunteerDataElement.textContent);
-    const campData = JSON.parse(campDataElement.textContent);
-
-    // Initialize map
-    deliveryMapInstance = L.map('delivery-map', {
-        zoomControl: false,
-        attributionControl: false
-    }).setView([volunteerData.lat, volunteerData.lon], 14);
+function calculateOptimizedRoute() {
+    const btn = document.getElementById('calculate-route-btn');
+    if (!btn) return;
     
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(deliveryMapInstance);
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-spinner"></span> Calculating...';
     
-    const csrftoken = getCookie('csrftoken');
-    const deliveryFormAction = `/donation/deliver/to/${campData.pk}/`;
-
-    // Add routing control with road path
-    const routingControl = L.Routing.control({
-        waypoints: [
-            L.latLng(volunteerData.lat, volunteerData.lon),
-            L.latLng(campData.latitude, campData.longitude)
-        ],
-        routeWhileDragging: false,
-        show: false,
-        addWaypoints: false,
-        createMarker: (i, waypoint) => {
-            if (i === 0) {
-                // Volunteer marker - will be updated by live tracking
-                volunteerMarker = L.marker(waypoint.latLng, { 
-                    icon: bikeIcon,
-                    zIndexOffset: 1000
-                }).bindPopup("<strong>Your Location</strong>");
-                return volunteerMarker;
-            } else {
-                // Camp marker
-                return L.marker(waypoint.latLng, { draggable: false })
-                    .bindPopup(`<strong>${campData.name}</strong><br>${campData.ngo_name}<br><small>${campData.address}</small>`);
-            }
+    // Get current GPS position if available
+    const requestBody = {};
+    if (currentVolunteerPosition) {
+        requestBody.current_lat = currentVolunteerPosition.lat;
+        requestBody.current_lon = currentVolunteerPosition.lon;
+    }
+    
+    fetch('/api/calculate-pickup-route/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
         },
-        lineOptions: {
-            styles: [{ color: '#10b981', weight: 5, opacity: 0.8 }]
+        body: JSON.stringify(requestBody)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayPickupRoute(data);
+            showToast('Optimal route calculated!', 'success');
+        } else {
+            showToast(data.message || 'Failed to calculate route', 'error');
         }
     })
-    .on('routesfound', function(e) {
-        const summary = e.routes[0].summary;
-        const distance = (summary.totalDistance / 1000).toFixed(2);
-        const time = Math.round(summary.totalTime / 60);
-        
-        // Store route coordinates for polyline updates
-        routePolyline = e.routes[0].coordinates;
-        
-        const deliveryInfo = document.getElementById('delivery-info');
-        if (deliveryInfo) {
-            deliveryInfo.innerHTML = `
-                <div class="route-summary">
-                    <p><strong>Distance:</strong> ${distance} km</p>
-                    <p><strong>ETA:</strong> ${time} minutes</p>
-                </div>
-            `;
-        }
+    .catch(error => {
+        console.error('[v0] Error calculating route:', error);
+        showToast('An error occurred. Please try again.', 'error');
     })
-    .addTo(deliveryMapInstance);
-    
-    // Start live tracking
-    startLiveLocationTracking(deliveryMapInstance, campData);
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+        </svg> Recalculate Route`;
+    });
 }
 
 /**
- * Start live location tracking using watchPosition
- * @param {L.Map} map - Leaflet map instance
- * @param {Object} campData - Camp destination data
+ * Display the calculated pickup route on the map
+ * @param {Object} data - Route data from API
  */
-function startLiveLocationTracking(map, campData) {
-    if (!navigator.geolocation) {
-        console.error('[v0] Geolocation not supported');
+function displayPickupRoute(data) {
+    const mapContainer = document.getElementById('pickup-map-container');
+    const infoBanner = document.getElementById('route-info-banner');
+    const mapElement = document.getElementById('pickup-route-map');
+    
+    if (!mapContainer || !mapElement) {
+        console.error('[v0] Pickup map container not found');
         return;
     }
     
-    console.log('[v0] Starting live location tracking...');
+    // Show the map container
+    mapContainer.style.display = 'block';
+    if (infoBanner) infoBanner.style.display = 'flex';
     
-    const trackingIndicator = document.getElementById('delivery-live-tracking') || document.getElementById('live-tracking-status');
-    if (trackingIndicator) {
-        trackingIndicator.style.display = 'flex';
+    // Update route info display
+    const distanceEl = document.getElementById('route-distance');
+    const timeEl = document.getElementById('route-time');
+    const stopsEl = document.getElementById('route-stops');
+    
+    if (distanceEl) distanceEl.textContent = data.total_distance_km;
+    if (timeEl) timeEl.textContent = data.estimated_time_minutes;
+    if (stopsEl) stopsEl.textContent = data.total_pickups;
+    
+    // Update pickup order badges in the list
+    data.route.forEach((loc, index) => {
+        if (index > 0) { // Skip volunteer location (index 0)
+            const badge = document.getElementById(`order-badge-${loc.id}`);
+            if (badge) {
+                badge.textContent = index;
+                badge.style.display = 'inline-flex';
+            }
+            // Highlight the first pickup
+            const card = document.getElementById(`pickup-card-${loc.id}`);
+            if (card && index === 1) {
+                card.classList.add('highlighted');
+            }
+        }
+    });
+    
+    // Initialize or reinitialize the map
+    if (pickupMapInstance) {
+        pickupMapInstance.remove();
+        pickupMapInstance = null;
+    }
+    
+    pickupMapInstance = L.map('pickup-route-map', {
+        zoomControl: true,
+        attributionControl: false
+    });
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickupMapInstance);
+    
+    // Ensure map renders correctly after container becomes visible
+    setTimeout(() => {
+        pickupMapInstance.invalidateSize();
+    }, 100);
+    
+    // Create waypoints from route data
+    const waypoints = data.route.map(loc => L.latLng(loc.lat, loc.lon));
+    
+    // Check if Leaflet Routing Machine is available
+    if (typeof L.Routing !== 'undefined') {
+        // Clear existing routing control
+        if (pickupRoutingControl) {
+            pickupMapInstance.removeControl(pickupRoutingControl);
+        }
+        
+        // Add routing with road path
+        pickupRoutingControl = L.Routing.control({
+            waypoints: waypoints,
+            routeWhileDragging: false,
+            show: false, // Hide turn-by-turn instructions
+            addWaypoints: false,
+            fitSelectedRoutes: true,
+            createMarker: function(i, waypoint) {
+                const loc = data.route[i];
+                if (i === 0) {
+                    // Volunteer marker
+                    volunteerPickupMarker = L.marker(waypoint.latLng, { 
+                        icon: bikeIcon, 
+                        zIndexOffset: 1000 
+                    }).bindPopup('<strong>Your Location</strong>');
+                    return volunteerPickupMarker;
+                } else {
+                    // Restaurant markers with order numbers
+                    return L.marker(waypoint.latLng, { 
+                        icon: createRestaurantIcon(i) 
+                    }).bindPopup(`<strong>Stop ${i}: ${loc.name}</strong>`);
+                }
+            },
+            lineOptions: {
+                styles: [{ color: '#10b981', weight: 5, opacity: 0.8 }]
+            }
+        }).addTo(pickupMapInstance);
+        
+        // Handle route found event
+        pickupRoutingControl.on('routesfound', function(e) {
+            // Update distance/time with actual road values if available
+            if (e.routes && e.routes[0]) {
+                const summary = e.routes[0].summary;
+                const actualDistance = (summary.totalDistance / 1000).toFixed(2);
+                const actualTime = Math.round(summary.totalTime / 60);
+                
+                if (distanceEl) distanceEl.textContent = actualDistance;
+                if (timeEl) timeEl.textContent = actualTime;
+            }
+        });
+    } else {
+        // Fallback: Add markers without routing
+        data.route.forEach((loc, index) => {
+            if (index === 0) {
+                volunteerPickupMarker = L.marker([loc.lat, loc.lon], { 
+                    icon: bikeIcon, 
+                    zIndexOffset: 1000 
+                }).addTo(pickupMapInstance).bindPopup('<strong>Your Location</strong>');
+            } else {
+                L.marker([loc.lat, loc.lon], { 
+                    icon: createRestaurantIcon(index) 
+                }).addTo(pickupMapInstance).bindPopup(`<strong>Stop ${index}: ${loc.name}</strong>`);
+            }
+        });
+        
+        // Draw simple polyline connecting all points
+        const latlngs = data.route.map(loc => [loc.lat, loc.lon]);
+        L.polyline(latlngs, { color: '#10b981', weight: 4, opacity: 0.8 }).addTo(pickupMapInstance);
+        
+        // Fit bounds
+        pickupMapInstance.fitBounds(latlngs, { padding: [30, 30] });
+    }
+    
+    // Show live tracking indicator
+    const trackingStatus = document.getElementById('live-tracking-status');
+    if (trackingStatus) trackingStatus.style.display = 'flex';
+}
+
+// ============ DELIVERY MAP (Mode B - Simple route to camp) ============
+
+/**
+ * Initialize delivery map showing route to nearest camp
+ */
+function initializeDeliveryMap() {
+    const mapContainer = document.getElementById('delivery-map');
+    const campDataEl = document.getElementById('nearest-camp-data');
+    const volunteerDataEl = document.getElementById('volunteer-location-data');
+    
+    if (!mapContainer) {
+        console.error('[v0] Delivery map container not found');
+        return;
+    }
+    
+    if (!campDataEl) {
+        mapContainer.innerHTML = '<p class="empty-state">No active camps found. Please register with an NGO first.</p>';
+        return;
+    }
+    
+    let campData, volunteerData;
+    
+    try {
+        campData = JSON.parse(campDataEl.textContent);
+        volunteerData = volunteerDataEl ? JSON.parse(volunteerDataEl.textContent) : null;
+    } catch (e) {
+        console.error('[v0] Error parsing map data:', e);
+        return;
+    }
+    
+    // Get volunteer location (GPS > profile > default)
+    let volunteerLat = 28.6448;
+    let volunteerLon = 77.2167;
+    
+    if (currentVolunteerPosition) {
+        volunteerLat = currentVolunteerPosition.lat;
+        volunteerLon = currentVolunteerPosition.lon;
+    } else if (volunteerData && volunteerData.lat && volunteerData.lon) {
+        volunteerLat = volunteerData.lat;
+        volunteerLon = volunteerData.lon;
+    }
+    
+    // Clean up existing map
+    if (deliveryMapInstance) {
+        deliveryMapInstance.remove();
+        deliveryMapInstance = null;
+    }
+    
+    // Initialize map
+    deliveryMapInstance = L.map('delivery-map', {
+        zoomControl: true,
+        attributionControl: false
+    }).setView([volunteerLat, volunteerLon], 14);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(deliveryMapInstance);
+    
+    // Critical: Force map to recalculate size after container is visible
+    setTimeout(() => {
+        deliveryMapInstance.invalidateSize();
+        
+        // Fit bounds after invalidateSize
+        deliveryMapInstance.fitBounds([
+            [volunteerLat, volunteerLon],
+            [campData.latitude, campData.longitude]
+        ], { padding: [50, 50] });
+    }, 200);
+    
+    // Add volunteer marker
+    volunteerDeliveryMarker = L.marker([volunteerLat, volunteerLon], { 
+        icon: bikeIcon, 
+        zIndexOffset: 1000 
+    }).addTo(deliveryMapInstance).bindPopup('<strong>Your Location</strong>');
+    
+    // Add camp marker
+    L.marker([campData.latitude, campData.longitude], { 
+        icon: campIcon 
+    }).addTo(deliveryMapInstance).bindPopup(
+        `<strong>${campData.name}</strong><br>${campData.ngo_name}<br><small>${campData.address}</small>`
+    );
+    
+    // Add routing with road path if available
+    if (typeof L.Routing !== 'undefined') {
+        deliveryRoutingControl = L.Routing.control({
+            waypoints: [
+                L.latLng(volunteerLat, volunteerLon),
+                L.latLng(campData.latitude, campData.longitude)
+            ],
+            routeWhileDragging: false,
+            show: false, // Hide turn-by-turn instructions panel
+            addWaypoints: false,
+            createMarker: function() { return null; }, // Don't create default markers (we have custom ones)
+            lineOptions: {
+                styles: [{ color: '#10b981', weight: 5, opacity: 0.8 }],
+                addWaypoints: false
+            }
+        }).addTo(deliveryMapInstance);
+        
+        // Update distance/time when route is found
+        deliveryRoutingControl.on('routesfound', function(e) {
+            if (e.routes && e.routes[0]) {
+                const summary = e.routes[0].summary;
+                const distance = (summary.totalDistance / 1000).toFixed(2);
+                const time = Math.round(summary.totalTime / 60);
+                
+                const distanceEl = document.getElementById('delivery-distance');
+                const etaEl = document.getElementById('delivery-eta');
+                
+                if (distanceEl) distanceEl.textContent = distance;
+                if (etaEl) etaEl.textContent = time;
+            }
+        });
+    } else {
+        // Fallback: Draw simple polyline
+        L.polyline([
+            [volunteerLat, volunteerLon],
+            [campData.latitude, campData.longitude]
+        ], { color: '#10b981', weight: 4, opacity: 0.8 }).addTo(deliveryMapInstance);
+    }
+    
+    // Show live tracking indicator
+    const trackingIndicator = document.getElementById('delivery-live-tracking');
+    if (trackingIndicator) trackingIndicator.style.display = 'flex';
+}
+
+// ============ LIVE LOCATION TRACKING ============
+
+/**
+ * Start GPS-based live location tracking
+ */
+function startLiveLocationTracking() {
+    if (!navigator.geolocation) {
+        console.warn('[v0] Geolocation not supported');
+        return;
     }
     
     liveTrackingWatchId = navigator.geolocation.watchPosition(
         (position) => {
             const { latitude, longitude, accuracy } = position.coords;
-            console.log(`[v0] Live position: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (accuracy: ${accuracy.toFixed(0)}m)`);
             
-            // Update volunteer marker position with smooth animation
-            if (volunteerMarker) {
-                volunteerMarker.setLatLng([latitude, longitude]);
-            } else if (map) {
-                volunteerMarker = L.marker([latitude, longitude], { 
-                    icon: bikeIcon,
-                    zIndexOffset: 1000
-                }).addTo(map).bindPopup("<strong>Your Location</strong>");
+            currentVolunteerPosition = { lat: latitude, lon: longitude };
+            
+            // Update volunteer markers on both maps
+            if (volunteerPickupMarker) {
+                volunteerPickupMarker.setLatLng([latitude, longitude]);
+            }
+            if (volunteerDeliveryMarker) {
+                volunteerDeliveryMarker.setLatLng([latitude, longitude]);
             }
             
-            // Calculate and update live ETA
-            if (campData) {
-                updateLiveETA(latitude, longitude, campData.latitude, campData.longitude);
-            }
-            
-            // Send location update to server
+            // Send location update to server (throttled)
             sendLocationUpdate(latitude, longitude, accuracy);
         },
         (error) => {
-            console.error('[v0] Geolocation error:', error.message);
-            let message = 'Location tracking error';
-            switch (error.code) {
-                case error.PERMISSION_DENIED:
-                    message = 'Please enable location access for live tracking';
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    message = 'Location unavailable';
-                    break;
-                case error.TIMEOUT:
-                    message = 'Location request timed out';
-                    break;
-            }
-            if (typeof showToast === 'function') {
-                showToast(message, 'warning');
-            }
+            console.warn('[v0] Geolocation error:', error.message);
         },
         {
             enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 5000
+            timeout: 15000,
+            maximumAge: 10000
         }
     );
 }
@@ -210,41 +453,21 @@ function stopLiveLocationTracking() {
     if (liveTrackingWatchId !== null) {
         navigator.geolocation.clearWatch(liveTrackingWatchId);
         liveTrackingWatchId = null;
-        console.log('[v0] Live tracking stopped');
     }
 }
 
-/**
- * Update live ETA based on current position
- */
-function updateLiveETA(currentLat, currentLon, destLat, destLon) {
-    // Calculate straight-line distance (approximation)
-    const R = 6371; // Earth's radius in km
-    const dLat = (destLat - currentLat) * Math.PI / 180;
-    const dLon = (destLon - currentLon) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(currentLat * Math.PI / 180) * Math.cos(destLat * Math.PI / 180) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-    
-    // Estimate time at 20 km/h average city speed
-    const etaMinutes = Math.round((distance / 20) * 60);
-    
-    // Update display
-    const etaElement = document.querySelector('.route-detail-value');
-    if (etaElement && etaElement.parentElement) {
-        const label = etaElement.parentElement.querySelector('.route-detail-label');
-        if (label && label.textContent.includes('Time')) {
-            etaElement.textContent = etaMinutes;
-        }
-    }
-}
+// Throttle location updates to server
+let lastLocationUpdate = 0;
+const LOCATION_UPDATE_INTERVAL = 30000; // 30 seconds
 
 /**
  * Send location update to server
  */
 function sendLocationUpdate(latitude, longitude, accuracy) {
+    const now = Date.now();
+    if (now - lastLocationUpdate < LOCATION_UPDATE_INTERVAL) return;
+    lastLocationUpdate = now;
+    
     const csrftoken = getCookie('csrftoken');
     
     fetch('/api/update-volunteer-location/', {
@@ -258,8 +481,10 @@ function sendLocationUpdate(latitude, longitude, accuracy) {
             longitude: longitude,
             accuracy: accuracy
         })
-    }).catch(err => console.error('[v0] Failed to send location update:', err));
+    }).catch(err => console.warn('[v0] Failed to send location update:', err));
 }
+
+// ============ DONATION ACTIONS ============
 
 /**
  * Accept a donation via AJAX
@@ -270,7 +495,7 @@ function acceptDonation(donationId) {
     const acceptBtn = document.getElementById(`accept-btn-${donationId}`);
     
     if (!acceptBtn) {
-        console.error('Accept button not found for donation:', donationId);
+        console.error('[v0] Accept button not found for donation:', donationId);
         return;
     }
     
@@ -294,6 +519,8 @@ function acceptDonation(donationId) {
             acceptBtn.style.color = 'white';
             acceptBtn.style.cursor = 'default';
             
+            showToast(data.message || 'Donation accepted! Please pick it up within 30 minutes.', 'success');
+            
             setTimeout(() => {
                 const row = document.getElementById(`donation-row-${donationId}`);
                 if (row) {
@@ -301,10 +528,9 @@ function acceptDonation(donationId) {
                     row.style.opacity = '0';
                     setTimeout(() => row.remove(), 300);
                 }
+                // Reload to update active pickups
+                setTimeout(() => location.reload(), 500);
             }, 1000);
-            
-            showToast(data.message || 'Donation accepted! Please pick it up within 30 minutes.', 'success');
-            setTimeout(() => location.reload(), 2000);
         } else {
             acceptBtn.disabled = false;
             acceptBtn.textContent = 'Accept';
@@ -313,7 +539,7 @@ function acceptDonation(donationId) {
         }
     })
     .catch(error => {
-        console.error('Error accepting donation:', error);
+        console.error('[v0] Error accepting donation:', error);
         acceptBtn.disabled = false;
         acceptBtn.textContent = 'Accept';
         acceptBtn.style.cursor = 'pointer';
@@ -344,7 +570,7 @@ function markAsCollected(donationId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showToast(data.message, 'success');
+            showToast(data.message || 'Marked as collected!', 'success');
             setTimeout(() => location.reload(), 1000);
         } else {
             collectBtn.disabled = false;
@@ -353,12 +579,61 @@ function markAsCollected(donationId) {
         }
     })
     .catch(error => {
-        console.error('Error:', error);
+        console.error('[v0] Error marking as collected:', error);
         collectBtn.disabled = false;
         collectBtn.textContent = 'Mark as Collected';
         showToast('An error occurred. Please try again.', 'error');
     });
 }
+
+/**
+ * Cancel a pickup (reset donation to PENDING)
+ * @param {number} donationId - ID of the donation to cancel
+ */
+function cancelPickup(donationId) {
+    if (!confirm('Are you sure you want to cancel this pickup? The donation will become available for other volunteers.')) {
+        return;
+    }
+    
+    const csrftoken = getCookie('csrftoken');
+    const cancelBtn = document.getElementById(`cancel-btn-${donationId}`);
+    
+    if (cancelBtn) {
+        cancelBtn.disabled = true;
+        cancelBtn.textContent = 'Cancelling...';
+    }
+    
+    fetch(`/donation/cancel-pickup/${donationId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message || 'Pickup cancelled successfully', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            if (cancelBtn) {
+                cancelBtn.disabled = false;
+                cancelBtn.textContent = 'Cancel';
+            }
+            showToast(data.message || 'Failed to cancel pickup', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('[v0] Error cancelling pickup:', error);
+        if (cancelBtn) {
+            cancelBtn.disabled = false;
+            cancelBtn.textContent = 'Cancel';
+        }
+        showToast('An error occurred. Please try again.', 'error');
+    });
+}
+
+// ============ NGO REGISTRATION ACTIONS ============
 
 /**
  * Register with an NGO via AJAX
@@ -392,7 +667,7 @@ function registerWithNGO(ngoId) {
         }
     })
     .catch(error => {
-        console.error('Error:', error);
+        console.error('[v0] Error registering with NGO:', error);
         registerBtn.disabled = false;
         registerBtn.textContent = 'Register';
         showToast('An error occurred. Please try again.', 'error');
@@ -437,7 +712,7 @@ function unregisterFromNGO(ngoId) {
         }
     })
     .catch(error => {
-        console.error('Error:', error);
+        console.error('[v0] Error unregistering from NGO:', error);
         if (unregisterBtn) {
             unregisterBtn.disabled = false;
             unregisterBtn.textContent = 'Unregister';
@@ -446,7 +721,7 @@ function unregisterFromNGO(ngoId) {
     });
 }
 
-// Cleanup on page unload
+// ============ CLEANUP ============
 window.addEventListener('beforeunload', function() {
     stopLiveLocationTracking();
 });

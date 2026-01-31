@@ -231,6 +231,10 @@
 .status-verifying {
   background-color: #6c757d;
 }
+.status-verification_pending {
+  background-color: #f59e0b;
+  color: #1f2937;
+}
 .status-delivered {
   background-color: var(--accent-green);
 }

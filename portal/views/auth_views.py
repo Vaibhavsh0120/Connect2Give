@@ -127,12 +127,18 @@ def register_step_2(request):
                     longitude=longitude
                 )
             elif user_type == User.UserType.NGO:
+                # Validate contact_number is 10 digits
+                contact_number = request.POST.get('contact_number', '').strip()
+                if not contact_number.isdigit() or len(contact_number) != 10:
+                    messages.error(request, 'Contact number must be exactly 10 digits.')
+                    return render(request, 'auth/register_step_2.html', {'error': 'Invalid contact number.'})
+                
                 NGOProfile.objects.create(
                     user=user,
                     ngo_name=request.POST.get('ngo_name'),
                     registration_number=request.POST.get('registration_number'),
                     address=address,
-                    contact_person=request.POST.get('contact_person'),
+                    contact_number=contact_number,
                     latitude=latitude,
                     longitude=longitude
                 )
