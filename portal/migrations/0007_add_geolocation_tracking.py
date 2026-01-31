@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('portal', '0005_add_donation_fields'),
+        ('portal', '0006_add_password_change_fields'),
     ]
 
     operations = [

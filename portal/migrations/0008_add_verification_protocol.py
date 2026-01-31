@@ -8,7 +8,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('portal', '0006_add_geolocation_tracking'),
+        ('portal', '0007_add_geolocation_tracking'),
     ]
 
     operations = [
