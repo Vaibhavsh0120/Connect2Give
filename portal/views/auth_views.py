@@ -150,7 +150,7 @@ def register_step_2(request):
 def login_page(request):
     if request.user.is_authenticated:
         # Check if user must change password
-        if hasattr(request.user, 'must_change_password') and request.user.must_change_password:
+        if getattr(request.user, 'must_change_password', False):  # type: ignore
             return redirect('force_password_change')
         return get_user_dashboard_redirect(request.user)
         
@@ -159,7 +159,8 @@ def login_page(request):
         if user is not None:
             login(request, user)
             # Check if user must change password
-            if hasattr(user, 'must_change_password') and user.must_change_password:
+            user = User.objects.get(pk=user.pk)  # Re-fetch to get the custom User model type
+            if user.must_change_password:  # type: ignore
                 messages.warning(request, 'You must change your password before proceeding.')
                 return redirect('force_password_change')
             messages.success(request, f'Successfully signed in as {user.username}.')
@@ -171,7 +172,7 @@ def login_page(request):
 @login_required(login_url='login_page')
 def force_password_change(request):
     """Force user to change password if must_change_password flag is True"""
-    if not (hasattr(request.user, 'must_change_password') and request.user.must_change_password):
+    if not getattr(request.user, 'must_change_password', False):  # type: ignore
         return redirect('login_page')
     
     if request.method == 'POST':
