@@ -16,6 +16,14 @@
             <div class="form-grid">
                 <div>
                     <div class="form-group">
+                        <label for="id_username">Username</label>
+                        <input type="text" name="username" id="id_username" value="{{ user.username }}" maxlength="150" class="{% if username_error %}input-error{% endif %}">
+                        {% if username_error %}
+                            <p class="field-error">{{ username_error }}</p>
+                        {% endif %}
+                        <p class="form-help-text">Your unique username for login and display.</p>
+                    </div>
+                    <div class="form-group">
                         {{ form.ngo_name.label_tag }}
                         {{ form.ngo_name }}
                     </div>

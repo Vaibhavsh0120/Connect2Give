@@ -93,18 +93,38 @@ def restaurant_donations(request):
 @login_required(login_url='login_page')
 @user_type_required('RESTAURANT')
 def restaurant_profile(request):
+    from ..models import User
     profile = get_object_or_404(RestaurantProfile, user=request.user)
+    username_error = None
     
     if request.method == 'POST':
         form = RestaurantProfileForm(request.POST, request.FILES, instance=profile)
-        if form.is_valid():
+        
+        # Handle username update
+        new_username = request.POST.get('username', '').strip()
+        
+        if new_username and new_username != request.user.username:
+            # Check if username is already taken
+            if User.objects.filter(username=new_username).exclude(pk=request.user.pk).exists():
+                username_error = 'This username is already taken.'
+            elif len(new_username) > 150:
+                username_error = 'Username must be 150 characters or fewer.'
+            elif len(new_username) < 3:
+                username_error = 'Username must be at least 3 characters.'
+            elif not new_username.replace('_', '').replace('-', '').isalnum():
+                username_error = 'Username can only contain letters, numbers, underscores, and hyphens.'
+            else:
+                request.user.username = new_username
+                request.user.save()
+        
+        if form.is_valid() and not username_error:
             form.save()
             messages.success(request, 'Your profile has been updated successfully!')
             return redirect('restaurant_profile')
     else:
         form = RestaurantProfileForm(instance=profile)
         
-    context = {'form': form}
+    context = {'form': form, 'username_error': username_error}
     return render(request, 'restaurant/profile.html', context)
 
 @login_required(login_url='login_page')

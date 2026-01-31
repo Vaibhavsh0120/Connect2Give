@@ -90,13 +90,7 @@
                 </div>
             </div>
 
-            {% if messages %}
-                <div class="messages-container" style="margin-bottom: 2rem;">
-                {% for message in messages %}
-                    <div class="{% if message.tags %}{{ message.tags }}{% endif %}-message">{{ message }}</div>
-                {% endfor %}
-                </div>
-            {% endif %}
+
             
             {% block volunteer_content %}
             {% endblock volunteer_content %}
@@ -107,6 +101,16 @@
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    {% if messages %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            {% for message in messages %}
+                showToast("{{ message|escapejs }}", "{{ message.tags }}");
+            {% endfor %}
+        });
+    </script>
+    {% endif %}
     
     {% block scripts %}{% endblock scripts %}
 {% endblock body %}

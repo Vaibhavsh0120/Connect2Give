@@ -7,7 +7,15 @@
 
 {% block ngo_content %}
     <div class="content-card">
-        <h3>My Registered Volunteers List</h3>
+        <div class="volunteers-header">
+            <h3>My Registered Volunteers List</h3>
+            <a href="{% url 'ngo_register_volunteer' %}" class="add-volunteer-btn">
+                <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                <span class="btn-text">Add Volunteer</span>
+            </a>
+        </div>
         <table class="data-table">
             <thead>
                 <tr>
@@ -35,11 +43,11 @@
                 <tr>
                     <td colspan="4">
                         <div class="empty-state">
-                            <div class="empty-state-icon" style="font-size: 3rem; margin-bottom: 1rem;">👥</div>
+                            <div class="empty-state-icon" style="font-size: 3rem; margin-bottom: 1rem;">&#128101;</div>
                             <p style="font-size: 1.125rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.5rem;">No Registered Volunteers Yet</p>
-                            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Volunteers can register with your NGO to help deliver donations to your camps.</p>
-                            <a href="{% url 'ngo_manage_camps' %}" class="btn" style="display: inline-block; background-color: var(--accent-primary); color: white; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; transition: all 0.2s ease;">
-                                Manage Camps
+                            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Add volunteers to your NGO to help deliver donations to your camps.</p>
+                            <a href="{% url 'ngo_register_volunteer' %}" class="btn" style="display: inline-block; background-color: var(--accent-primary); color: white; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; transition: all 0.2s ease;">
+                                Add Your First Volunteer
                             </a>
                         </div>
                     </td>
@@ -48,4 +56,51 @@
             </tbody>
         </table>
     </div>
+
+    <style>
+        .volunteers-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .volunteers-header h3 {
+            margin: 0;
+        }
+        .add-volunteer-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background-color: var(--accent-primary);
+            color: white;
+            padding: 0.625rem 1.25rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .add-volunteer-btn:hover {
+            background-color: var(--accent-primary-dark, #0891b2);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 173, 181, 0.3);
+        }
+        .add-volunteer-btn .btn-icon {
+            flex-shrink: 0;
+        }
+        
+        @media (max-width: 480px) {
+            .volunteers-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .add-volunteer-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
 {% endblock %}

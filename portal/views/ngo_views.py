@@ -86,10 +86,27 @@ def ngo_profile(request):
 
     if request.method == 'POST':
         form = NGOProfileForm(request.POST, request.FILES, instance=profile)
-        if form.is_valid():
+        
+        # Handle username update
+        new_username = request.POST.get('username', '').strip()
+        username_error = None
+        
+        if new_username and new_username != request.user.username:
+            # Check if username is already taken
+            if User.objects.filter(username=new_username).exclude(pk=request.user.pk).exists():
+                username_error = 'This username is already taken.'
+            elif len(new_username) > 150:
+                username_error = 'Username must be 150 characters or fewer.'
+            else:
+                request.user.username = new_username
+                request.user.save()
+        
+        if form.is_valid() and not username_error:
             form.save()
             messages.success(request, 'Your profile has been updated successfully!')
             return redirect('ngo_profile')
+        elif username_error:
+            messages.error(request, username_error)
     else:
         form = NGOProfileForm(instance=profile)
 
@@ -212,14 +229,16 @@ def ngo_reset_volunteer_password(request, volunteer_id):
         html_message = render_to_string('emails/volunteer_password_reset.html', context)
         plain_message = strip_tags(html_message)
         
-        send_mail(
-            subject,
-            plain_message,
-            settings.DEFAULT_FROM_EMAIL,
-            [volunteer_profile.email],
-            html_message=html_message,
-            fail_silently=False,
-        )
+        recipient_email = volunteer_profile.email
+        if recipient_email:
+            send_mail(
+                subject,
+                plain_message,
+                settings.DEFAULT_FROM_EMAIL,
+                [recipient_email],
+                html_message=html_message,
+                fail_silently=False,
+            )
         
         messages.success(request, f'New password sent to {volunteer_profile.full_name}')
         return redirect('ngo_register_volunteer')

@@ -153,17 +153,38 @@ def volunteer_manage_camps(request):
 @login_required(login_url='login_page')
 @user_type_required('VOLUNTEER')
 def volunteer_profile(request):
+    from ..models import User
     profile = get_object_or_404(VolunteerProfile, user=request.user)
+    username_error = None
+    
     if request.method == 'POST':
         form = VolunteerProfileForm(request.POST, request.FILES, instance=profile)
-        if form.is_valid():
+        
+        # Handle username update
+        new_username = request.POST.get('username', '').strip()
+        
+        if new_username and new_username != request.user.username:
+            # Check if username is already taken
+            if User.objects.filter(username=new_username).exclude(pk=request.user.pk).exists():
+                username_error = 'This username is already taken.'
+            elif len(new_username) > 150:
+                username_error = 'Username must be 150 characters or fewer.'
+            elif len(new_username) < 3:
+                username_error = 'Username must be at least 3 characters.'
+            elif not new_username.replace('_', '').replace('-', '').isalnum():
+                username_error = 'Username can only contain letters, numbers, underscores, and hyphens.'
+            else:
+                request.user.username = new_username
+                request.user.save()
+        
+        if form.is_valid() and not username_error:
             form.save()
             messages.success(request, 'Your profile has been updated successfully!')
             return redirect('volunteer_profile')
     else:
         form = VolunteerProfileForm(instance=profile)
         
-    context = {'form': form}
+    context = {'form': form, 'username_error': username_error}
     return render(request, 'volunteer/profile.html', context)
 
 @login_required(login_url='login_page')
@@ -378,7 +399,7 @@ def calculate_pickup_route(request):
                 pickup_locations.append(Location(
                     lat=donation.restaurant.latitude,
                     lon=donation.restaurant.longitude,
-                    location_id=donation.id,
+                    location_id=donation.pk,
                     location_type='donation',
                     name=f"{donation.restaurant.restaurant_name} - {donation.food_description}"
                 ))
@@ -473,7 +494,7 @@ def calculate_delivery_route(request):
                 camp_location = Location(
                     lat=camp.latitude,
                     lon=camp.longitude,
-                    location_id=camp.id,
+                    location_id=camp.pk,
                     location_type='camp'
                 )
                 distance = volunteer_location.distance_to(camp_location)
@@ -502,7 +523,7 @@ def calculate_delivery_route(request):
             'success': True,
             'route': build_route_map_data(route),
             'nearest_camp': {
-                'id': camp.id,
+                'id': camp.pk,
                 'name': camp.name,
                 'ngo_name': camp.ngo.ngo_name,
                 'address': camp.location_address
