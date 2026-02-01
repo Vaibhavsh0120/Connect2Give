@@ -4,11 +4,296 @@
 {% block title %}Account Settings - {{ block.super }}{% endblock %}
 
 {% block page_title %}Account Settings{% endblock %}
-{% block page_description %}Manage your account preferences.{% endblock %}
+{% block page_description %}Manage your account preferences and security.{% endblock %}
 
 {% block restaurant_content %}
-    <div class="placeholder-content">
-        <p>This is where you will be able to manage your account settings, such as changing your password or deleting your account.</p>
-        <p><strong>This feature is currently under development.</strong></p>
+<style>
+    .settings-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+    .settings-card h3 {
+        margin: 0 0 16px 0;
+        font-size: 1.1rem;
+        color: #111827;
+    }
+    .settings-card p {
+        margin: 0 0 12px 0;
+        font-size: 0.95rem;
+        color: #6b7280;
+    }
+    .settings-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .settings-row:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+    .settings-info {
+        flex: 1;
+    }
+    .settings-info strong {
+        display: block;
+        margin-bottom: 4px;
+        color: #111827;
+    }
+    .settings-info small {
+        color: #9ca3af;
+    }
+    .settings-action {
+        display: flex;
+        gap: 8px;
+    }
+    .btn-action {
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        font-size: 0.9rem;
+        border: none;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+    .btn-action.primary {
+        background: #3b82f6;
+        color: white;
+    }
+    .btn-action.primary:hover {
+        background: #2563eb;
+    }
+    .btn-action.danger {
+        background: #fee2e2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+    }
+    .btn-action.danger:hover {
+        background: #fecaca;
+    }
+    .btn-action:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .form-group {
+        margin-bottom: 16px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+        font-size: 0.9rem;
+        color: #374151;
+    }
+    .form-group input {
+        width: 100%;
+        max-width: 400px;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 0.95rem;
+    }
+    .info-text {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        font-size: 0.9rem;
+        color: #1e40af;
+    }
+</style>
+
+<div class="settings-card">
+    <h3>Account Security</h3>
+    <p>Manage how you sign in to your account.</p>
+    
+    {% if user.has_usable_password and user.social_auth.count > 0 %}
+        {# User has both email/password and Google auth #}
+        <div class="settings-row">
+            <div class="settings-info">
+                <strong>Email & Password</strong>
+                <small>You can sign in with your email and password</small>
+            </div>
+            <div class="settings-action">
+                <button class="btn-action primary" onclick="openPasswordChangeModal()">Change Password</button>
+            </div>
+        </div>
+        
+        <div class="settings-row">
+            <div class="settings-info">
+                <strong>Google Account</strong>
+                <small>{{ user.email }}</small>
+            </div>
+            <div class="settings-action">
+                <button class="btn-action danger" onclick="confirmUnlinkGoogle()">Unlink</button>
+            </div>
+        </div>
+    
+    {% elif user.has_usable_password and user.social_auth.count == 0 %}
+        {# User only has email/password #}
+        <div class="settings-row">
+            <div class="settings-info">
+                <strong>Email & Password</strong>
+                <small>You can sign in with your email and password</small>
+            </div>
+            <div class="settings-action">
+                <button class="btn-action primary" onclick="openPasswordChangeModal()">Change Password</button>
+            </div>
+        </div>
+        
+        <div class="settings-row">
+            <div class="settings-info">
+                <strong>Link Google Account</strong>
+                <small>Add an extra sign-in method for convenience</small>
+            </div>
+            <div class="settings-action">
+                <a href="#" class="btn-action primary">Link Google</a>
+            </div>
+        </div>
+    
+    {% elif not user.has_usable_password and user.social_auth.count > 0 %}
+        {# User only has Google auth #}
+        <div class="info-text">
+            You signed up with Google. Set a password to be able to sign in with your email as well.
+        </div>
+        
+        <div class="settings-row">
+            <div class="settings-info">
+                <strong>Google Account</strong>
+                <small>{{ user.email }}</small>
+            </div>
+            <div class="settings-action">
+                <button class="btn-action danger" onclick="confirmUnlinkGoogle()">Unlink</button>
+            </div>
+        </div>
+        
+        <div class="settings-row">
+            <div class="settings-info">
+                <strong>Set Password</strong>
+                <small>Create a password to sign in with email</small>
+            </div>
+            <div class="settings-action">
+                <button class="btn-action primary" onclick="openSetPasswordModal()">Set Password</button>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+{# Password Change Modal #}
+<div id="password-change-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 32px; max-width: 400px; width: 90%; box-shadow: 0 20px 25px rgba(0,0,0,0.15);">
+        <h3 style="margin: 0 0 24px 0;">Change Password</h3>
+        
+        <form id="change-password-form" action="{% url 'force_password_change' %}" method="POST">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="new_password">New Password</label>
+                <input type="password" id="new_password" name="new_password" required minlength="8" placeholder="At least 8 characters">
+            </div>
+            
+            <div class="form-group">
+                <label for="new_password2">Confirm Password</label>
+                <input type="password" id="new_password2" name="new_password2" required minlength="8" placeholder="Confirm your password">
+            </div>
+            
+            <div style="display: flex; gap: 12px;">
+                <button type="button" class="btn-action" style="flex: 1; background: #f3f4f6; color: #374151;" onclick="closePasswordChangeModal()">Cancel</button>
+                <button type="submit" class="btn-action primary" style="flex: 1;">Save Password</button>
+            </div>
+        </form>
     </div>
+</div>
+
+{# Set Password Modal #}
+<div id="set-password-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 32px; max-width: 400px; width: 90%; box-shadow: 0 20px 25px rgba(0,0,0,0.15);">
+        <h3 style="margin: 0 0 24px 0;">Set Password</h3>
+        
+        <div class="info-text" style="margin-bottom: 20px;">
+            Create a password to enable email/password login in addition to Google authentication.
+        </div>
+        
+        <form id="set-password-form" action="{% url 'set_password_after_google' %}" method="POST">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="set_new_password">New Password</label>
+                <input type="password" id="set_new_password" name="new_password" required minlength="8" placeholder="At least 8 characters">
+            </div>
+            
+            <div class="form-group">
+                <label for="set_new_password2">Confirm Password</label>
+                <input type="password" id="set_new_password2" name="new_password2" required minlength="8" placeholder="Confirm your password">
+            </div>
+            
+            <div style="display: flex; gap: 12px;">
+                <button type="button" class="btn-action" style="flex: 1; background: #f3f4f6; color: #374151;" onclick="closeSetPasswordModal()">Cancel</button>
+                <button type="submit" class="btn-action primary" style="flex: 1;">Set Password</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openPasswordChangeModal() {
+    document.getElementById('password-change-modal').style.display = 'flex';
+}
+
+function closePasswordChangeModal() {
+    document.getElementById('password-change-modal').style.display = 'none';
+}
+
+function openSetPasswordModal() {
+    document.getElementById('set-password-modal').style.display = 'flex';
+}
+
+function closeSetPasswordModal() {
+    document.getElementById('set-password-modal').style.display = 'none';
+}
+
+function confirmUnlinkGoogle() {
+    if (confirm('Are you sure you want to unlink your Google account?')) {
+        const csrftoken = getCookie('csrftoken');
+        fetch('{% url "unlink_google_account" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Google account unlinked successfully', 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showToast(data.message || 'Failed to unlink Google account', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('[v0] Error:', error);
+            showToast('An error occurred', 'error');
+        });
+    }
+}
+
+// Close modals when clicking outside
+document.addEventListener('click', function(e) {
+    const passwordModal = document.getElementById('password-change-modal');
+    const setPasswordModal = document.getElementById('set-password-modal');
+    
+    if (e.target === passwordModal) closePasswordChangeModal();
+    if (e.target === setPasswordModal) closeSetPasswordModal();
+});
+</script>
 {% endblock restaurant_content %}

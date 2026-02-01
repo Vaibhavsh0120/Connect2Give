@@ -51,32 +51,32 @@ def volunteer_dashboard(request):
 
 @login_required(login_url='login_page')
 @user_type_required('VOLUNTEER')
-def volunteer_manage_pickups(request):
+def volunteer_pickups(request):
+    """
+    View for "My Pickups" - Manage donations in ACCEPTED status
+    Shows restaurants to pick up from and allows marking items as collected
+    """
     volunteer_profile = request.user.volunteer_profile
-    view = request.GET.get('view')
     
+    # Auto-expire pickups not collected within 30 minutes
     thirty_minutes_ago = timezone.now() - timedelta(minutes=30)
-    Donation.objects.filter(status='ACCEPTED', accepted_at__lt=thirty_minutes_ago).update(status='PENDING', assigned_volunteer=None, accepted_at=None)
+    Donation.objects.filter(status='ACCEPTED', accepted_at__lt=thirty_minutes_ago).update(
+        status='PENDING', assigned_volunteer=None, accepted_at=None
+    )
 
-    # Optimized queries with select_related for foreign keys
+    # Get active pickups (ACCEPTED donations)
     active_donations = Donation.objects.filter(
         assigned_volunteer=volunteer_profile, 
-        status__in=['ACCEPTED', 'COLLECTED']
+        status='ACCEPTED'
     ).select_related('restaurant').order_by('accepted_at')
     
-    delivery_history = Donation.objects.filter(
-        assigned_volunteer=volunteer_profile, 
-        status__in=['VERIFYING', 'DELIVERED']
-    ).select_related('restaurant', 'target_camp').order_by('-delivered_at')
-    
+    # Get available donations for new pickups
     available_donations = Donation.objects.filter(
         status='PENDING'
     ).select_related('restaurant').order_by('-created_at')
     
-    # Get search query
+    # Search filtering
     search_query = request.GET.get('q', '').strip()
-    
-    # Apply search filter
     if search_query:
         from django.db.models import Q
         available_donations = available_donations.filter(
@@ -84,60 +84,91 @@ def volunteer_manage_pickups(request):
             Q(pickup_address__icontains=search_query)
         )
 
-    # Calculate stats for the new UI
-    collected_count = active_donations.filter(status='COLLECTED').count()
-    accepted_count = active_donations.filter(status='ACCEPTED').count()
-    pending_verification_count = Donation.objects.filter(
+    # Get stats
+    collected_count = Donation.objects.filter(
         assigned_volunteer=volunteer_profile,
-        status='VERIFICATION_PENDING'
+        status='COLLECTED'
     ).count()
-    total_deliveries = Donation.objects.filter(
-        assigned_volunteer=volunteer_profile,
-        status='DELIVERED'
-    ).count()
-    
-    # Guard logic for delivery mode access
-    has_uncollected_items = accepted_count > 0
-    can_access_delivery = collected_count > 0 and not has_uncollected_items
     
     context = {
         'active_donations': active_donations,
         'available_donations': available_donations,
-        'delivery_history': delivery_history,
-        'view': view,
         'collected_count': collected_count,
-        'uncollected_count': accepted_count,
+    }
+    
+    return render(request, 'volunteer/pickups.html', context)
+
+
+@login_required(login_url='login_page')
+@user_type_required('VOLUNTEER')
+def volunteer_deliveries(request):
+    """
+    View for "My Deliveries" - Manage delivery of COLLECTED donations
+    Shows map to nearest camp and handles delivery completion
+    """
+    volunteer_profile = request.user.volunteer_profile
+    
+    # Get collected donations ready for delivery
+    collected_donations = Donation.objects.filter(
+        assigned_volunteer=volunteer_profile, 
+        status='COLLECTED'
+    ).select_related('restaurant').order_by('collected_at')
+    
+    # Get delivery history
+    delivery_history = Donation.objects.filter(
+        assigned_volunteer=volunteer_profile, 
+        status__in=['VERIFICATION_PENDING', 'DELIVERED']
+    ).select_related('restaurant', 'target_camp').order_by('-delivered_at')
+    
+    # Get stats
+    active_pickups = Donation.objects.filter(
+        assigned_volunteer=volunteer_profile,
+        status='ACCEPTED'
+    ).count()
+    
+    pending_verification_count = Donation.objects.filter(
+        assigned_volunteer=volunteer_profile,
+        status='VERIFICATION_PENDING'
+    ).count()
+    
+    completed_deliveries = Donation.objects.filter(
+        assigned_volunteer=volunteer_profile,
+        status='DELIVERED'
+    ).count()
+    
+    context = {
+        'collected_donations': collected_donations,
+        'delivery_history': delivery_history,
+        'active_pickups': active_pickups,
+        'collected_count': collected_donations.count(),
         'pending_verification_count': pending_verification_count,
-        'total_deliveries': total_deliveries,
-        'has_uncollected_items': has_uncollected_items,
-        'can_access_delivery': can_access_delivery,
+        'completed_deliveries': completed_deliveries,
     }
 
-    if view == 'delivery_route':
-        # Profile location is used as fallback; GPS location will be used in frontend
+    # If user has collected items, prepare map data
+    if collected_donations.exists():
+        # Profile location as fallback; GPS will be used in frontend
         if not volunteer_profile.latitude or not volunteer_profile.longitude:
             messages.warning(request, 'Please enable location access or set your location in your profile for accurate routing.')
         
-        # Use route optimizer with geodesic calculations (free, no API key needed)
         route_optimizer = get_route_optimizer(use_google_maps=False)
         
-        # Use profile location as initial/fallback (frontend will use GPS)
-        volunteer_lat = volunteer_profile.latitude or 0
-        volunteer_lon = volunteer_profile.longitude or 0
-        
         volunteer_location = Location(
-            lat=volunteer_lat,
-            lon=volunteer_lon,
+            lat=volunteer_profile.latitude or 0,
+            lon=volunteer_profile.longitude or 0,
             location_id=0,
             location_type='volunteer',
             name='Your Location'
         )
         
-        active_camps = DonationCamp.objects.filter(ngo__in=volunteer_profile.registered_ngos.all(), is_active=True)
+        # Get active camps from registered NGOs
+        active_camps = DonationCamp.objects.filter(
+            ngo__in=volunteer_profile.registered_ngos.all(), 
+            is_active=True
+        )
         
-        # Convert camps to Location objects
         camp_locations = []
-        camp_map = {}  # Map location to camp
+        camp_map = {}
         for camp in active_camps:
             if camp.latitude and camp.longitude:
                 loc = Location(
@@ -150,11 +181,8 @@ def volunteer_manage_pickups(request):
                 camp_locations.append(loc)
                 camp_map[camp.pk] = camp
         
-        # Find nearest camp using road distance (Google Maps) or geodesic fallback
+        # Find nearest camp
         nearest_camp = None
-        nearest_distance = 0
-        nearest_eta = 0
-        
         if camp_locations:
             nearest_loc, nearest_distance, nearest_eta = route_optimizer.find_nearest_location(
                 volunteer_location, camp_locations
@@ -163,8 +191,6 @@ def volunteer_manage_pickups(request):
                 nearest_camp = camp_map[nearest_loc.id]
         
         context['nearest_camp'] = nearest_camp
-        context['nearest_distance_km'] = round(nearest_distance, 2)
-        context['nearest_eta_minutes'] = int(nearest_eta)
         
         if nearest_camp:
             context['nearest_camp_data'] = {
@@ -175,12 +201,28 @@ def volunteer_manage_pickups(request):
                 'ngo_name': nearest_camp.ngo.ngo_name,
                 'address': nearest_camp.location_address
             }
+        
         context['volunteer_location_data'] = {
             'lat': volunteer_profile.latitude,
             'lon': volunteer_profile.longitude
         }
 
-    return render(request, 'volunteer/manage_pickups.html', context)
+    return render(request, 'volunteer/deliveries.html', context)
+
+
+@login_required(login_url='login_page')
+@user_type_required('VOLUNTEER')
+def volunteer_manage_pickups(request):
+    """
+    Deprecated: Redirect to pickups or deliveries view based on status
+    Kept for backward compatibility
+    """
+    view = request.GET.get('view')
+    
+    if view == 'delivery_route':
+        return redirect('volunteer_deliveries')
+    else:
+        return redirect('volunteer_pickups')
 
 
 @login_required(login_url='login_page')

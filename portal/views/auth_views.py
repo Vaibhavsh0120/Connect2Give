@@ -99,10 +99,30 @@ def register_step_2(request):
         longitude = request.POST.get('longitude') or None
         address = request.POST.get('address')
         
+        # Get and validate username
+        username = request.POST.get('username', '').strip().lower()
+        username_error = None
+        
+        # Validate username
+        if not username or len(username) < 3:
+            username_error = 'Username must be at least 3 characters.'
+        elif len(username) > 150:
+            username_error = 'Username must be 150 characters or fewer.'
+        elif User.objects.filter(username=username).exists():
+            username_error = 'This username is already taken.'
+        elif not username.replace('_', '').replace('-', '').isalnum():
+            username_error = 'Username can only contain letters, numbers, underscores, and hyphens.'
+        
+        if username_error:
+            return render(request, 'auth/register_step_2.html', {'error': username_error})
+        
         user = None
         if registration_data: # Manual registration flow
+            # Use username from session if provided from step 1
+            step1_username = registration_data.get('username', username)
+            
             user = User.objects.create_user(
-                username=registration_data['username'],
+                username=step1_username,
                 email=registration_data['email'],
                 password=registration_data['password'],
                 user_type=user_type,
@@ -113,6 +133,9 @@ def register_step_2(request):
 
         elif request.user.is_authenticated: # Google registration flow
             user = request.user
+            # Update username if user had auto-generated one
+            if user.username != username:
+                user.username = username
             user.user_type = user_type
             user.save()
 
@@ -149,6 +172,8 @@ def register_step_2(request):
     context = {}
     if request.user.is_authenticated:
         context['user'] = request.user
+        # Pre-fill username for Google signup (either their nickname or empty)
+        context['prefill_username'] = request.user.username or request.user.first_name or ''
 
     return render(request, 'auth/register_step_2.html', context)
 
@@ -223,3 +248,70 @@ def google_callback(request):
             return redirect('register_step_2')
         return get_user_dashboard_redirect(request.user)
     return redirect('login_page')
+
+
+@login_required(login_url='login_page')
+def link_google_account(request):
+    """Initiate Google linking for an already authenticated user"""
+    # For users with email/password signup, link their Google account
+    # This is typically handled by the social auth library
+    messages.info(request, 'Click the "Link Google Account" button below to connect your Google account.')
+    return redirect(request.META.get('HTTP_REFERER', 'volunteer_settings'))
+
+
+@login_required(login_url='login_page')
+def unlink_google_account(request):
+    """Unlink Google account from user if they have a local password set"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid request'}, status=400)
+    
+    try:
+        user = request.user
+        
+        # Check if user has a password set
+        if not user.has_usable_password():
+            return JsonResponse({
+                'success': False, 
+                'message': 'Cannot unlink Google without a password. Set a password first.'
+            }, status=400)
+        
+        # Try to remove Google social auth entry
+        try:
+            from social_django.models import UserSocialAuth
+            social_auth = UserSocialAuth.objects.get(user=user, provider='google-oauth2')
+            social_auth.delete()
+            messages.success(request, 'Google account successfully unlinked.')
+            return JsonResponse({'success': True, 'message': 'Google account unlinked'})
+        except:
+            return JsonResponse({
+                'success': False, 
+                'message': 'Google account is not linked'
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
+
+@login_required(login_url='login_page')
+def set_password_after_google(request):
+    """Allow Google-signed-up users to set a local password"""
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password')
+        new_password2 = request.POST.get('new_password2')
+        
+        if new_password != new_password2:
+            messages.error(request, 'Passwords do not match.')
+            return redirect(request.META.get('HTTP_REFERER', 'volunteer_settings'))
+        
+        if len(new_password) < 8:
+            messages.error(request, 'Password must be at least 8 characters long.')
+            return redirect(request.META.get('HTTP_REFERER', 'volunteer_settings'))
+        
+        request.user.set_password(new_password)
+        request.user.save()
+        
+        messages.success(request, 'Password set successfully! You can now login with your email and password.')
+        return redirect(request.META.get('HTTP_REFERER', 'volunteer_settings'))
+    
+    messages.error(request, 'Invalid request')
+    return redirect('volunteer_settings')

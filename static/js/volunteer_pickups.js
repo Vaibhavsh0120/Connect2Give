@@ -10,11 +10,8 @@
 
 // ============ GLOBAL STATE ============
 let pickupMapInstance = null;
-let deliveryMapInstance = null;
 let pickupRoutingControl = null;
-let deliveryRoutingControl = null;
 let volunteerPickupMarker = null;
-let volunteerDeliveryMarker = null;
 let liveTrackingWatchId = null;
 let currentVolunteerPosition = null;
 
@@ -81,16 +78,7 @@ function createRestaurantIcon(number) {
 
 // ============ PAGE INITIALIZATION ============
 document.addEventListener('DOMContentLoaded', function () {
-    const currentView = document.body.dataset.currentView || '';
-    
-    if (currentView === "delivery_route") {
-        // Initialize delivery map after a short delay to ensure container is visible
-        setTimeout(() => {
-            initializeDeliveryMap();
-        }, 100);
-    }
-    
-    // Start live location tracking for both modes
+    // Start live location tracking
     startLiveLocationTracking();
 });
 
@@ -283,129 +271,8 @@ function displayPickupRoute(data) {
     if (trackingStatus) trackingStatus.style.display = 'flex';
 }
 
-// ============ DELIVERY MAP (Mode B - Simple route to camp) ============
-
-/**
- * Initialize delivery map showing route to nearest camp
- */
-function initializeDeliveryMap() {
-    const mapContainer = document.getElementById('delivery-map');
-    const campDataEl = document.getElementById('nearest-camp-data');
-    const volunteerDataEl = document.getElementById('volunteer-location-data');
-    
-    if (!mapContainer) {
-        console.error('[v0] Delivery map container not found');
-        return;
-    }
-    
-    if (!campDataEl) {
-        mapContainer.innerHTML = '<p class="empty-state">No active camps found. Please register with an NGO first.</p>';
-        return;
-    }
-    
-    let campData, volunteerData;
-    
-    try {
-        campData = JSON.parse(campDataEl.textContent);
-        volunteerData = volunteerDataEl ? JSON.parse(volunteerDataEl.textContent) : null;
-    } catch (e) {
-        console.error('[v0] Error parsing map data:', e);
-        return;
-    }
-    
-    // Get volunteer location (GPS > profile > default)
-    let volunteerLat = 28.6448;
-    let volunteerLon = 77.2167;
-    
-    if (currentVolunteerPosition) {
-        volunteerLat = currentVolunteerPosition.lat;
-        volunteerLon = currentVolunteerPosition.lon;
-    } else if (volunteerData && volunteerData.lat && volunteerData.lon) {
-        volunteerLat = volunteerData.lat;
-        volunteerLon = volunteerData.lon;
-    }
-    
-    // Clean up existing map
-    if (deliveryMapInstance) {
-        deliveryMapInstance.remove();
-        deliveryMapInstance = null;
-    }
-    
-    // Initialize map
-    deliveryMapInstance = L.map('delivery-map', {
-        zoomControl: true,
-        attributionControl: false
-    }).setView([volunteerLat, volunteerLon], 14);
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(deliveryMapInstance);
-    
-    // Critical: Force map to recalculate size after container is visible
-    setTimeout(() => {
-        deliveryMapInstance.invalidateSize();
-        
-        // Fit bounds after invalidateSize
-        deliveryMapInstance.fitBounds([
-            [volunteerLat, volunteerLon],
-            [campData.latitude, campData.longitude]
-        ], { padding: [50, 50] });
-    }, 200);
-    
-    // Add volunteer marker
-    volunteerDeliveryMarker = L.marker([volunteerLat, volunteerLon], { 
-        icon: bikeIcon, 
-        zIndexOffset: 1000 
-    }).addTo(deliveryMapInstance).bindPopup('<strong>Your Location</strong>');
-    
-    // Add camp marker
-    L.marker([campData.latitude, campData.longitude], { 
-        icon: campIcon 
-    }).addTo(deliveryMapInstance).bindPopup(
-        `<strong>${campData.name}</strong><br>${campData.ngo_name}<br><small>${campData.address}</small>`
-    );
-    
-    // Add routing with road path if available
-    if (typeof L.Routing !== 'undefined') {
-        deliveryRoutingControl = L.Routing.control({
-            waypoints: [
-                L.latLng(volunteerLat, volunteerLon),
-                L.latLng(campData.latitude, campData.longitude)
-            ],
-            routeWhileDragging: false,
-            show: false, // Hide turn-by-turn instructions panel
-            addWaypoints: false,
-            createMarker: function() { return null; }, // Don't create default markers (we have custom ones)
-            lineOptions: {
-                styles: [{ color: '#10b981', weight: 5, opacity: 0.8 }],
-                addWaypoints: false
-            }
-        }).addTo(deliveryMapInstance);
-        
-        // Update distance/time when route is found
-        deliveryRoutingControl.on('routesfound', function(e) {
-            if (e.routes && e.routes[0]) {
-                const summary = e.routes[0].summary;
-                const distance = (summary.totalDistance / 1000).toFixed(2);
-                const time = Math.round(summary.totalTime / 60);
-                
-                const distanceEl = document.getElementById('delivery-distance');
-                const etaEl = document.getElementById('delivery-eta');
-                
-                if (distanceEl) distanceEl.textContent = distance;
-                if (etaEl) etaEl.textContent = time;
-            }
-        });
-    } else {
-        // Fallback: Draw simple polyline
-        L.polyline([
-            [volunteerLat, volunteerLon],
-            [campData.latitude, campData.longitude]
-        ], { color: '#10b981', weight: 4, opacity: 0.8 }).addTo(deliveryMapInstance);
-    }
-    
-    // Show live tracking indicator
-    const trackingIndicator = document.getElementById('delivery-live-tracking');
-    if (trackingIndicator) trackingIndicator.style.display = 'flex';
-}
+// ============ PICKUP MAP SPECIFIC CODE ============
+// (Delivery map code is now in volunteer_deliveries.js - separate file)
 
 // ============ LIVE LOCATION TRACKING ============
 
@@ -424,12 +291,9 @@ function startLiveLocationTracking() {
             
             currentVolunteerPosition = { lat: latitude, lon: longitude };
             
-            // Update volunteer markers on both maps
+            // Update volunteer marker on pickup map
             if (volunteerPickupMarker) {
                 volunteerPickupMarker.setLatLng([latitude, longitude]);
-            }
-            if (volunteerDeliveryMarker) {
-                volunteerDeliveryMarker.setLatLng([latitude, longitude]);
             }
             
             // Send location update to server (throttled)

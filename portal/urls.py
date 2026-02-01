@@ -44,6 +44,11 @@ urlpatterns = [
     # --- Google OAuth Callback ---
     path('accounts/google/login/callback/', views.google_callback, name='google_callback'),
     
+    # --- Account Security URLs ---
+    path('account/link-google/', views.link_google_account, name='link_google_account'),
+    path('account/unlink-google/', views.unlink_google_account, name='unlink_google_account'),
+    path('account/set-password/', views.set_password_after_google, name='set_password_after_google'),
+    
     # --- Restaurant Dashboard URLs ---
     path('dashboard/restaurant/', views.restaurant_dashboard, name='restaurant_dashboard'),
     path('dashboard/restaurant/donations/', views.restaurant_donations, name='restaurant_donations'),
@@ -61,7 +66,9 @@ urlpatterns = [
 
     # --- Volunteer Dashboard URLs ---
     path('dashboard/volunteer/', views.volunteer_dashboard, name='volunteer_dashboard'),
-    path('dashboard/volunteer/pickups/', views.volunteer_manage_pickups, name='volunteer_manage_pickups'),
+    path('dashboard/volunteer/pickups/', views.volunteer_pickups, name='volunteer_pickups'),
+    path('dashboard/volunteer/deliveries/', views.volunteer_deliveries, name='volunteer_deliveries'),
+    path('dashboard/volunteer/manage-pickups/', views.volunteer_manage_pickups, name='volunteer_manage_pickups'),  # Legacy redirect
     path('dashboard/volunteer/camps/', views.volunteer_manage_camps, name='volunteer_manage_camps'),
     path('dashboard/volunteer/profile/', views.volunteer_profile, name='volunteer_profile'),
     path('dashboard/volunteer/settings/', views.volunteer_settings, name='volunteer_settings'),
