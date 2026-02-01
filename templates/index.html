@@ -1316,16 +1316,26 @@
                     <div class="navbar-user">
                         <div class="navbar-user-info">
                             <div class="navbar-user-name">{{ user.username }}</div>
-                            <div class="navbar-user-role">{{ user.get_user_type_display }}</div>
+                            <div class="navbar-user-role">
+                                {% if user.is_superuser %}
+                                    Administrator
+                                {% else %}
+                                    {{ user.get_user_type_display }}
+                                {% endif %}
+                            </div>
                         </div>
                         <div class="navbar-avatar">{{ user.username|first|upper }}</div>
                     </div>
-                    <a href="{% get_dashboard_url user %}" class="navbar-btn navbar-btn-login">Dashboard</a>
+                    {% if not user.is_superuser %}
+                        <a href="{% get_dashboard_url user %}" class="navbar-btn navbar-btn-login">Dashboard</a>
+                    {% endif %}
                     <a href="{% url 'logout' %}" class="navbar-btn navbar-btn-signup">Logout</a>
                 </div>
                 <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">☰</button>
                 <div class="mobile-menu" id="mobile-menu">
-                    <a href="{% get_dashboard_url user %}" class="navbar-btn navbar-btn-login">Dashboard</a>
+                    {% if not user.is_superuser %}
+                        <a href="{% get_dashboard_url user %}" class="navbar-btn navbar-btn-login">Dashboard</a>
+                    {% endif %}
                     <a href="{% url 'logout' %}" class="navbar-btn navbar-btn-signup">Logout</a>
                 </div>
             {% else %}
@@ -1343,16 +1353,27 @@
     </nav>
 
     {% if user.is_authenticated %}
-        <div class="welcome-card">
-            <div class="welcome-icon">👋</div>
-            <h1>Welcome back, {{ user.username }}!</h1>
-            <div class="user-type-badge">{{ user.get_user_type_display }}</div>
-            <div>
-                <a href="{% get_dashboard_url user %}" class="btn">Go to Dashboard</a>
-                <a href="{% url 'logout' %}" class="btn btn-secondary">Logout</a>
+        {% if user.is_superuser %}
+            <div class="welcome-card">
+                <div class="welcome-icon">⚠️</div>
+                <h1>Admin Access Restricted</h1>
+                <p>You are logged in as a Superuser.</p>
+                <p>Please logout and login as a normal user to access the portal features.</p>
+                <div>
+                    <a href="{% url 'logout' %}" class="btn">Logout</a>
+                </div>
             </div>
-        </div>
-
+        {% else %}
+            <div class="welcome-card">
+                <div class="welcome-icon">👋</div>
+                <h1>Welcome back, {{ user.username }}!</h1>
+                <div class="user-type-badge">{{ user.get_user_type_display }}</div>
+                <div>
+                    <a href="{% get_dashboard_url user %}" class="btn">Go to Dashboard</a>
+                    <a href="{% url 'logout' %}" class="btn btn-secondary">Logout</a>
+                </div>
+            </div>
+        {% endif %}
     {% else %}
         <div class="full-width">
              {% comment %} Hero section with dynamic background  {% endcomment %}
@@ -1714,3 +1735,4 @@
         </script>
     {% endif %}
 {% endblock %}
+}

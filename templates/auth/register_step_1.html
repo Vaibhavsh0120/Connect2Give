@@ -38,31 +38,12 @@
                     <span>or register with email</span>
                 </div>
 
-                <form action="{% url 'register_step_1' %}" method="POST">
+                <form action="{% url 'register_step_1' %}" method="POST" onsubmit="return validatePassword()">
                     {% csrf_token %}
                     
                     <div class="form-group">
                         <label for="full_name">Full Name</label>
                         <input type="text" name="full_name" id="full_name" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="username">Username</label>
-                        <div style="position: relative; display: flex; align-items: center;">
-                            <input 
-                                type="text" 
-                                name="username" 
-                                id="username" 
-                                required 
-                                minlength="3"
-                                autocomplete="username"
-                                style="width: 100%;"
-                                placeholder="Choose a unique username"
-                                oninput="checkUsername()"
-                            >
-                            <span id="username-status" style="position: absolute; right: 12px; font-size: 18px;"></span>
-                        </div>
-                        <small id="username-message" style="color: #64748b; font-size: 0.85rem; display: block; margin-top: 4px;">Minimum 3 characters</small>
                     </div>
 
                     <div class="form-group">
@@ -94,6 +75,9 @@
                                     <path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
                                 </svg>
                             </button>
+                        </div>
+                        <div id="password-error" style="color: #ef4444; font-size: 0.85rem; margin-top: 4px; display: none;">
+                            Passwords do not match
                         </div>
                     </div>
 
@@ -131,60 +115,33 @@
             }
         }
 
-        function checkUsername() {
-            const username = document.getElementById('username').value.trim().toLowerCase();
-            const statusEl = document.getElementById('username-status');
-            const messageEl = document.getElementById('username-message');
-            const submitBtn = document.getElementById('submit-btn');
+        // Real-time password matching validation
+        const pass1 = document.getElementById('password');
+        const pass2 = document.getElementById('password2');
+        const errorEl = document.getElementById('password-error');
+        const submitBtn = document.getElementById('submit-btn');
 
-            if (username.length < 3) {
-                statusEl.innerHTML = '';
-                messageEl.textContent = 'Minimum 3 characters';
-                messageEl.style.color = '#64748b';
-                submitBtn.disabled = false;
-                return;
+        function checkPasswords() {
+            if (pass2.value && pass1.value !== pass2.value) {
+                errorEl.style.display = 'block';
+                return false;
+            } else {
+                errorEl.style.display = 'none';
+                return true;
             }
-
-            // Check availability via AJAX
-            fetch(`{% url 'check_username' %}?username=${encodeURIComponent(username)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.available) {
-                        statusEl.innerHTML = '✓';
-                        statusEl.style.color = '#10b981';
-                        messageEl.textContent = data.message;
-                        messageEl.style.color = '#10b981';
-                        submitBtn.disabled = false;
-                    } else {
-                        statusEl.innerHTML = '✕';
-                        statusEl.style.color = '#ef4444';
-                        messageEl.textContent = data.message;
-                        messageEl.style.color = '#ef4444';
-                        submitBtn.disabled = true;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error checking username:', error);
-                    statusEl.innerHTML = '';
-                    messageEl.textContent = 'Could not verify username';
-                    messageEl.style.color = '#f59e0b';
-                });
         }
 
-        document.querySelector('form').addEventListener('submit', function(e) {
-            const submitBtn = this.querySelector('.auth-submit-btn');
-            const username = document.getElementById('username').value.trim();
-            
-            // Final check that username is available
-            if (username.length < 3) {
-                e.preventDefault();
-                alert('Username must be at least 3 characters long');
-                return;
+        pass1.addEventListener('input', checkPasswords);
+        pass2.addEventListener('input', checkPasswords);
+
+        function validatePassword() {
+            if (!checkPasswords()) {
+                return false;
             }
-            
             submitBtn.classList.add('loading');
             submitBtn.disabled = true;
-        });
+            return true;
+        }
     </script>
 </body>
 </html>

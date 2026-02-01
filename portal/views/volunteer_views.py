@@ -265,7 +265,17 @@ def volunteer_profile(request):
 @login_required(login_url='login_page')
 @user_type_required('VOLUNTEER')
 def volunteer_settings(request):
-    return render(request, 'volunteer/settings.html')
+    # Check if user has a Google account linked
+    is_google_linked = False
+    if hasattr(request.user, 'socialaccount_set'):
+        # Check specifically for Google provider
+        is_google_linked = request.user.socialaccount_set.filter(provider='google').exists()
+    
+    context = {
+        'is_google_linked': is_google_linked,
+        'has_usable_password': request.user.has_usable_password()
+    }
+    return render(request, 'volunteer/settings.html', context)
 
 
 # --- ACTION VIEWS ---

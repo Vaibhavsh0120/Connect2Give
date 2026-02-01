@@ -13,6 +13,10 @@ from django.conf import settings
 from ..models import User, RestaurantProfile, NGOProfile, VolunteerProfile
 
 def get_user_dashboard_redirect(user):
+    # If the user is a superuser (Admin), redirect to index to show the restriction message
+    if user.is_superuser:
+        return redirect('index')
+
     if user.user_type == User.UserType.RESTAURANT:
         return redirect('restaurant_dashboard')
     elif user.user_type == User.UserType.NGO:
@@ -47,16 +51,10 @@ def register_step_1(request):
     if request.method == 'POST':
         full_name = request.POST.get('full_name')
         email = request.POST.get('email')
-        username = request.POST.get('username', '').strip().lower()
+        # Username collection removed from Step 1
         password = request.POST.get('password')
         password2 = request.POST.get('password2')
 
-        # Validate username
-        if not username or len(username) < 3:
-            return render(request, 'auth/register_step_1.html', {'error': 'Username must be at least 3 characters.'})
-        if User.objects.filter(username=username).exists():
-            return render(request, 'auth/register_step_1.html', {'error': 'This username is already taken.'})
-        
         if password != password2:
             return render(request, 'auth/register_step_1.html', {'error': 'Passwords do not match.'})
         if User.objects.filter(email=email).exists():
@@ -66,7 +64,7 @@ def register_step_1(request):
             'full_name': full_name,
             'email': email,
             'password': password,
-            'username': username
+            # Username is no longer stored here; collected in Step 2
         }
         return redirect('register_step_2')
     return render(request, 'auth/register_step_1.html')
@@ -109,7 +107,9 @@ def register_step_2(request):
         elif len(username) > 150:
             username_error = 'Username must be 150 characters or fewer.'
         elif User.objects.filter(username=username).exists():
-            username_error = 'This username is already taken.'
+            # If Google user is just updating their profile but keeping their generated username (if it matches), skip check
+            if not (request.user.is_authenticated and request.user.username == username):
+                username_error = 'This username is already taken.'
         elif not username.replace('_', '').replace('-', '').isalnum():
             username_error = 'Username can only contain letters, numbers, underscores, and hyphens.'
         
@@ -118,7 +118,8 @@ def register_step_2(request):
         
         user = None
         if registration_data: # Manual registration flow
-            # Use username from session if provided from step 1
+            # Username is now collected in Step 2, so we use the 'username' variable from POST directly.
+            # Fallback to session is no longer needed for 'username', but kept for robustness if logic changes back.
             step1_username = registration_data.get('username', username)
             
             user = User.objects.create_user(

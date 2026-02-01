@@ -23,6 +23,10 @@ import os
 
 # FIX 1: Update this function to correctly redirect new users
 def get_user_dashboard_redirect(user):
+    # Check for Superuser first to avoid registration redirect
+    if user.is_superuser:
+        return redirect('index')
+
     if user.user_type == User.UserType.RESTAURANT:
         return redirect('restaurant_dashboard')
     elif user.user_type == User.UserType.NGO:
@@ -35,14 +39,22 @@ def get_user_dashboard_redirect(user):
 
 def index(request):
     # FIX 2: Add this check at the top of the index view
-    if request.user.is_authenticated:
+    # Only redirect to dashboard if authenticated AND NOT a superuser
+    if request.user.is_authenticated and not request.user.is_superuser:
         return get_user_dashboard_redirect(request.user)
         
-    # The rest of the function is for non-logged-in users
+    # The rest of the function is for non-logged-in users OR Superusers
     active_camps = DonationCamp.objects.filter(is_active=True).select_related('ngo')
     all_restaurants = RestaurantProfile.objects.filter(latitude__isnull=False, longitude__isnull=False)
-    camps_map_data = [{"lat": c.latitude, "lon": c.longitude, "name": c.name, "ngo": c.ngo.ngo_name, "address": c.location_address, "start": c.start_time.strftime('%d %b %Y, %H:%M')} for c in active_camps if c.latitude and c.longitude]
-    restaurants_map_data = [{"lat": r.latitude, "lon": r.longitude, "name": r.restaurant_name, "address": r.address} for r in all_restaurants]
+    
+    camps_map_data = []
+    if active_camps.exists():
+        camps_map_data = [{"lat": c.latitude, "lon": c.longitude, "name": c.name, "ngo": c.ngo.ngo_name, "address": c.location_address, "start": c.start_time.strftime('%d %b %Y, %H:%M')} for c in active_camps if c.latitude and c.longitude]
+    
+    restaurants_map_data = []
+    if all_restaurants.exists():
+        restaurants_map_data = [{"lat": r.latitude, "lon": r.longitude, "name": r.restaurant_name, "address": r.address} for r in all_restaurants]
+    
     context = {'camps_map_data': json.dumps(camps_map_data), 'restaurants_map_data': json.dumps(restaurants_map_data)}
     return render(request, 'index.html', context)
 

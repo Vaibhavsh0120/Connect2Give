@@ -83,6 +83,9 @@
     .btn-action:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+        background: #e5e7eb;
+        color: #9ca3af;
+        border: 1px solid #e5e7eb;
     }
     .form-group {
         margin-bottom: 16px;
@@ -111,46 +114,46 @@
         font-size: 0.9rem;
         color: #1e40af;
     }
+    .error-text {
+        color: #dc2626;
+        font-size: 0.85rem;
+        margin-top: 4px;
+        display: none;
+    }
 </style>
 
 <div class="settings-card">
     <h3>Account Security</h3>
     <p>Manage how you sign in to your account.</p>
     
-    {% with has_google_auth=user.socialauth_set.filter|dictsort:"provider"|length %}
-    
-    {% if user.has_usable_password and has_google_auth > 0 %}
-        {# User has both email/password and Google auth #}
+    {# Case 1: Hybrid User (Has Password, Has Google) #}
+    {% if has_usable_password and is_google_linked %}
         <div class="settings-row">
             <div class="settings-info">
-                <strong>Email & Password</strong>
-                <small>You can sign in with your email and password</small>
+                <strong>Password</strong>
+                <small>You have a secure password set</small>
             </div>
             <div class="settings-action">
                 <button class="btn-action primary" onclick="openPasswordChangeModal()">Change Password</button>
             </div>
         </div>
         
-        {% for social_account in user.socialauth_set.all %}
-            {% if social_account.provider == "google-oauth2" %}
-            <div class="settings-row">
-                <div class="settings-info">
-                    <strong>Google Account</strong>
-                    <small>{{ social_account.extra_data.email }}</small>
-                </div>
-                <div class="settings-action">
-                    <button class="btn-action danger" onclick="confirmUnlinkGoogle()">Unlink</button>
-                </div>
-            </div>
-            {% endif %}
-        {% endfor %}
-    
-    {% elif user.has_usable_password and has_google_auth == 0 %}
-        {# User only has email/password #}
         <div class="settings-row">
             <div class="settings-info">
-                <strong>Email & Password</strong>
-                <small>You can sign in with your email and password</small>
+                <strong>Google Account</strong>
+                <small>Linked</small>
+            </div>
+            <div class="settings-action">
+                <button class="btn-action danger" onclick="confirmUnlinkGoogle()">Unlink</button>
+            </div>
+        </div>
+
+    {# Case 2: Manual User (Has password, No Google) #}
+    {% elif has_usable_password and not is_google_linked %}
+        <div class="settings-row">
+            <div class="settings-info">
+                <strong>Password</strong>
+                <small>You have a secure password set</small>
             </div>
             <div class="settings-action">
                 <button class="btn-action primary" onclick="openPasswordChangeModal()">Change Password</button>
@@ -160,45 +163,55 @@
         <div class="settings-row">
             <div class="settings-info">
                 <strong>Link Google Account</strong>
-                <small>Add an extra sign-in method for convenience</small>
+                <small>Connect your Google account for easier login</small>
             </div>
             <div class="settings-action">
                 <a href="{% provider_login_url 'google' process='connect' %}" class="btn-action primary">Link Google</a>
             </div>
         </div>
-    
-    {% elif not user.has_usable_password and has_google_auth > 0 %}
-        {# User only has Google auth #}
+
+    {# Case 3: Google User (No Password, Has Google) - Default fallback for Google login users #}
+    {% else %}
         <div class="info-text">
-            You signed up with Google. Set a password to be able to sign in with your email as well.
+            You are signed in with Google. Set a password to enable email/password login and to manage your Google connection.
         </div>
-        
-        {% for social_account in user.socialauth_set.all %}
-            {% if social_account.provider == "google-oauth2" %}
-            <div class="settings-row">
-                <div class="settings-info">
-                    <strong>Google Account</strong>
-                    <small>{{ social_account.extra_data.email }}</small>
-                </div>
-                <div class="settings-action">
-                    <button class="btn-action danger" onclick="confirmUnlinkGoogle()">Unlink</button>
-                </div>
-            </div>
-            {% endif %}
-        {% endfor %}
         
         <div class="settings-row">
             <div class="settings-info">
-                <strong>Set Password</strong>
-                <small>Create a password to sign in with email</small>
+                <strong>Password</strong>
+                <small>No local password set</small>
             </div>
             <div class="settings-action">
                 <button class="btn-action primary" onclick="openSetPasswordModal()">Set Password</button>
             </div>
         </div>
+        
+        <div class="settings-row">
+            <div class="settings-info">
+                <strong>Google Account</strong>
+                <small>Linked</small>
+            </div>
+            <div class="settings-action">
+                <button class="btn-action" disabled title="Set a password first to unlink Google">Unlink</button>
+            </div>
+        </div>
     {% endif %}
+</div>
+
+{# Danger Zone - Always visible outside the conditions above #}
+<div class="settings-card" style="border: 2px solid #fee2e2; background: #fef2f2;">
+    <h3 style="color: #dc2626;">Danger Zone</h3>
+    <p>Irreversible and destructive actions</p>
     
-    {% endwith %}
+    <div class="settings-row" style="border-color: #fecaca;">
+        <div class="settings-info">
+            <strong style="color: #dc2626;">Delete Account</strong>
+            <small>Permanently delete your account and all associated data. This cannot be undone.</small>
+        </div>
+        <div class="settings-action">
+            <button class="btn-action danger" onclick="confirmDeleteAccount()">Delete Account</button>
+        </div>
+    </div>
 </div>
 
 {# Password Change Modal #}
@@ -206,7 +219,7 @@
     <div style="background: white; border-radius: 12px; padding: 32px; max-width: 400px; width: 90%; box-shadow: 0 20px 25px rgba(0,0,0,0.15);">
         <h3 style="margin: 0 0 24px 0;">Change Password</h3>
         
-        <form id="change-password-form" action="{% url 'force_password_change' %}" method="POST">
+        <form id="change-password-form" action="{% url 'force_password_change' %}" method="POST" onsubmit="return validatePasswordChange()">
             {% csrf_token %}
             
             <div class="form-group">
@@ -217,6 +230,7 @@
             <div class="form-group">
                 <label for="new_password2">Confirm Password</label>
                 <input type="password" id="new_password2" name="new_password2" required minlength="8" placeholder="Confirm your password">
+                <div id="change-password-error" class="error-text">Passwords do not match</div>
             </div>
             
             <div style="display: flex; gap: 12px;">
@@ -236,7 +250,7 @@
             Create a password to enable email/password login in addition to Google authentication.
         </div>
         
-        <form id="set-password-form" action="{% url 'set_password_after_google' %}" method="POST">
+        <form id="set-password-form" action="{% url 'set_password_after_google' %}" method="POST" onsubmit="return validateSetPassword()">
             {% csrf_token %}
             
             <div class="form-group">
@@ -247,6 +261,7 @@
             <div class="form-group">
                 <label for="set_new_password2">Confirm Password</label>
                 <input type="password" id="set_new_password2" name="new_password2" required minlength="8" placeholder="Confirm your password">
+                <div id="set-password-error" class="error-text">Passwords do not match</div>
             </div>
             
             <div style="display: flex; gap: 12px;">
@@ -258,7 +273,7 @@
 </div>
 
 <script>
-// Helper function to get CSRF token (if not available from common.js)
+// Helper function to get CSRF token
 window.getCookie = window.getCookie || function(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -274,14 +289,13 @@ window.getCookie = window.getCookie || function(name) {
     return cookieValue;
 };
 
-// Helper function to show toast messages (if not available from common.js)
+// Helper function to show toast messages
 window.showToast = window.showToast || function(message, type = 'info') {
     console.log('[v0] Toast:', type, message);
-    // Fallback: simple alert if showToast not defined
     if (type === 'error') {
         alert('Error: ' + message);
     } else if (type === 'success') {
-        console.log('[v0] Success:', message);
+        alert('Success: ' + message);
     }
 };
 
@@ -291,6 +305,7 @@ function openPasswordChangeModal() {
 
 function closePasswordChangeModal() {
     document.getElementById('password-change-modal').style.display = 'none';
+    document.getElementById('change-password-error').style.display = 'none';
 }
 
 function openSetPasswordModal() {
@@ -299,7 +314,58 @@ function openSetPasswordModal() {
 
 function closeSetPasswordModal() {
     document.getElementById('set-password-modal').style.display = 'none';
+    document.getElementById('set-password-error').style.display = 'none';
 }
+
+// Validation logic for Change Password
+function validatePasswordChange() {
+    const p1 = document.getElementById('new_password').value;
+    const p2 = document.getElementById('new_password2').value;
+    const errorEl = document.getElementById('change-password-error');
+    
+    if (p1 !== p2) {
+        errorEl.style.display = 'block';
+        return false;
+    }
+    errorEl.style.display = 'none';
+    return true;
+}
+
+// Validation logic for Set Password
+function validateSetPassword() {
+    const p1 = document.getElementById('set_new_password').value;
+    const p2 = document.getElementById('set_new_password2').value;
+    const errorEl = document.getElementById('set-password-error');
+    
+    if (p1 !== p2) {
+        errorEl.style.display = 'block';
+        return false;
+    }
+    errorEl.style.display = 'none';
+    return true;
+}
+
+// Real-time validation for confirm password inputs
+document.getElementById('new_password2').addEventListener('input', function() {
+    const p1 = document.getElementById('new_password').value;
+    const errorEl = document.getElementById('change-password-error');
+    if (this.value && this.value !== p1) {
+        errorEl.style.display = 'block';
+    } else {
+        errorEl.style.display = 'none';
+    }
+});
+
+document.getElementById('set_new_password2').addEventListener('input', function() {
+    const p1 = document.getElementById('set_new_password').value;
+    const errorEl = document.getElementById('set-password-error');
+    if (this.value && this.value !== p1) {
+        errorEl.style.display = 'block';
+    } else {
+        errorEl.style.display = 'none';
+    }
+});
+
 
 function confirmUnlinkGoogle() {
     if (confirm('Are you sure you want to unlink your Google account?')) {
@@ -315,8 +381,6 @@ function confirmUnlinkGoogle() {
         .then(data => {
             if (data.success) {
                 showToast('Google account unlinked successfully', 'success');
-                
-                // Reload the page to show updated settings
                 setTimeout(() => {
                     window.location.reload();
                 }, 1000);
@@ -339,24 +403,7 @@ document.addEventListener('click', function(e) {
     if (e.target === passwordModal) closePasswordChangeModal();
     if (e.target === setPasswordModal) closeSetPasswordModal();
 });
-</script>
 
-<div class="settings-card" style="border: 2px solid #fee2e2; background: #fef2f2;">
-    <h3 style="color: #dc2626;">Danger Zone</h3>
-    <p>Irreversible and destructive actions</p>
-    
-    <div class="settings-row" style="border-color: #fecaca;">
-        <div class="settings-info">
-            <strong style="color: #dc2626;">Delete Account</strong>
-            <small>Permanently delete your account and all associated data. This cannot be undone.</small>
-        </div>
-        <div class="settings-action">
-            <button class="btn-action danger" onclick="confirmDeleteAccount()">Delete Account</button>
-        </div>
-    </div>
-</div>
-
-<script>
 function confirmDeleteAccount() {
     const confirmed = confirm('Are you sure you want to delete your account? This action cannot be undone. All your data will be permanently deleted.');
     if (!confirmed) return;
@@ -364,32 +411,8 @@ function confirmDeleteAccount() {
     const doubleConfirmed = confirm('This is your last chance. Click OK to permanently delete your account.');
     if (!doubleConfirmed) return;
     
-    const csrftoken = getCookie('csrftoken');
-    
-    // TODO: Implement delete account endpoint
+    // Placeholder for delete logic
     showToast('Account deletion endpoint not yet implemented', 'error');
-    // fetch('/account/delete/', {
-    //     method: 'POST',
-    //     headers: {
-    //         'X-CSRFToken': csrftoken,
-    //         'Content-Type': 'application/json'
-    //     }
-    // })
-    // .then(response => response.json())
-    // .then(data => {
-    //     if (data.success) {
-    //         showToast('Account deleted successfully', 'success');
-    //         setTimeout(() => {
-    //             window.location.href = '{% url "index" %}';
-    //         }, 1500);
-    //     } else {
-    //         showToast(data.message || 'Failed to delete account', 'error');
-    //     }
-    // })
-    // .catch(error => {
-    //     console.error('[v0] Error:', error);
-    //     showToast('An error occurred', 'error');
-    // });
 }
 </script>
 {% endblock volunteer_content %}
