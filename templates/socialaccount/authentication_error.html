@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Login Failed" %} - Connect2Give{% endblock %}
+
+{% block content %}
+<div class="auth-error-container">
+    <div class="error-card">
+        <div class="error-icon">
+            <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+        </div>
+        
+        <h1>{% trans "Connection Failed" %}</h1>
+        
+        <p class="error-message">
+            {% trans "An error occurred while attempting to connect your third-party account." %}
+        </p>
+
+        {% if auth_error %}
+        <div class="debug-info">
+            <p><strong>{% trans "Error Details:" %}</strong></p>
+            <code>{{ auth_error.exception }}</code>
+        </div>
+        {% endif %}
+
+        <div class="troubleshooting-tips">
+            <p>{% trans "Possible reasons:" %}</p>
+            <ul>
+                <li>{% trans "This Google account is already linked to another user." %}</li>
+                <li>{% trans "The operation timed out (please try again)." %}</li>
+                <li>{% trans "You switched browsers or tabs during the process." %}</li>
+            </ul>
+        </div>
+
+        <div class="action-buttons">
+            <a href="{% url 'socialaccount_connections' %}" class="btn-primary">
+                {% trans "Try Again" %}
+            </a>
+            <a href="{% url 'index' %}" class="btn-secondary">
+                {% trans "Go to Dashboard" %}
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-error-container {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding-top: 4rem;
+        min-height: 80vh;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    .error-card {
+        background: white;
+        padding: 3rem 2rem;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+        border: 1px solid #fee2e2;
+        max-width: 480px;
+        width: 100%;
+        text-align: center;
+    }
+
+    .error-icon {
+        color: #dc2626;
+        background: #fef2f2;
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+    }
+
+    h1 {
+        color: #111827;
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .error-message {
+        color: #4b5563;
+        margin-bottom: 1.5rem;
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    .debug-info {
+        background: #f3f4f6;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        text-align: left;
+        font-size: 0.875rem;
+        color: #374151;
+        overflow-x: auto;
+    }
+    .debug-info p { margin: 0 0 0.5rem; }
+    .debug-info code { 
+        font-family: monospace; 
+        color: #dc2626;
+        display: block;
+    }
+
+    .troubleshooting-tips {
+        text-align: left;
+        background: #fffbeb;
+        border: 1px solid #fcd34d;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+    .troubleshooting-tips p {
+        font-weight: 600;
+        color: #92400e;
+        margin: 0 0 0.5rem;
+        font-size: 0.9rem;
+    }
+    .troubleshooting-tips ul {
+        margin: 0;
+        padding-left: 1.25rem;
+        color: #92400e;
+        font-size: 0.9rem;
+    }
+    .troubleshooting-tips li {
+        margin-bottom: 0.25rem;
+    }
+
+    .action-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .btn-primary, .btn-secondary {
+        display: block;
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #dc2626;
+        color: white;
+    }
+    .btn-primary:hover {
+        background: #b91c1c;
+    }
+
+    .btn-secondary {
+        background: white;
+        border: 1px solid #d1d5db;
+        color: #374151;
+    }
+    .btn-secondary:hover {
+        background: #f9fafb;
+        border-color: #9ca3af;
+    }
+</style>
+{% endblock %}

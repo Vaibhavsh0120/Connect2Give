@@ -1,220 +1,334 @@
-{% extends "account/base.html" %}
+{% extends "base.html" %}
 {% load i18n %}
 {% load socialaccount %}
 
-{% block head_title %}{% trans "Account Connections" %}{% endblock %}
+{% block title %}{% trans "Account Connections" %} - Connect2Give{% endblock %}
 
 {% block content %}
-<div class="account-connections-container">
-    <h1>{% trans "Account Connections" %}</h1>
-    
-    <style>
-        .account-connections-container {
-            max-width: 600px;
-            margin: 2rem auto;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-        }
-        
-        .account-connections-container h1 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: #1f2937;
-            margin-bottom: 1.5rem;
-        }
-        
-        .account-connections-container p {
-            color: #6b7280;
-            margin-bottom: 1.5rem;
-            line-height: 1.6;
-        }
-        
-        .connections-list {
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        
-        .connection-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px;
-            border-bottom: 1px solid #f3f4f6;
-            transition: background-color 0.2s;
-        }
-        
-        .connection-item:last-child {
-            border-bottom: none;
-        }
-        
-        .connection-item:hover {
-            background-color: #f9fafb;
-        }
-        
-        .connection-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .connection-icon {
-            width: 40px;
-            height: 40px;
-            background: #10b981;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 700;
-            font-size: 1.1rem;
-        }
-        
-        .connection-details h3 {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #1f2937;
-            margin: 0;
-        }
-        
-        .connection-details p {
-            font-size: 0.9rem;
-            color: #9ca3af;
-            margin: 4px 0 0 0;
-        }
-        
-        .connection-actions {
-            display: flex;
-            gap: 8px;
-        }
-        
-        .btn {
-            padding: 8px 16px;
-            border-radius: 6px;
-            border: none;
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-            display: inline-block;
-        }
-        
-        .btn-danger {
-            background: #fee2e2;
-            color: #dc2626;
-        }
-        
-        .btn-danger:hover {
-            background: #fecaca;
-        }
-        
-        .btn-primary {
-            background: #10b981;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #059669;
-        }
-        
-        .empty-state {
-            padding: 32px 16px;
-            text-align: center;
-            color: #9ca3af;
-        }
-        
-        .add-connection-section {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 20px;
-            margin-top: 2rem;
-        }
-        
-        .add-connection-section h3 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #1f2937;
-            margin-top: 0;
-        }
-        
-        .providers-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 12px;
-        }
-        
-        .provider-button {
-            padding: 12px;
-            text-align: center;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            background: white;
-            color: #1f2937;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        
-        .provider-button:hover {
-            background: #f0fdf4;
-            border-color: #10b981;
-            color: #10b981;
-        }
-    </style>
+<div class="connections-wrapper">
+    <div class="header-actions">
+        <a href="javascript:history.back()" class="btn-back">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            <span>Back to Settings</span>
+        </a>
+    </div>
 
-    {% if account.socialaccount_set.all %}
-        <p>{% trans "You can sign in to your account using any of the following third-party accounts:" %}</p>
+    <div class="connections-card">
+        <div class="card-header">
+            <h1>{% trans "Account Connections" %}</h1>
+            <p>{% trans "Manage the third-party accounts linked to your profile for easier login." %}</p>
+        </div>
         
-        <div class="connections-list">
-            {% for socialaccount in account.socialaccount_set.all %}
-                <div class="connection-item">
-                    <div class="connection-info">
-                        <div class="connection-icon">
-                            {% if socialaccount.provider == "google-oauth2" %}G{% endif %}
+        <style>
+            /* Page & Wrapper */
+            .connections-wrapper {
+                max-width: 640px;
+                margin: 3rem auto;
+                padding: 0 1rem;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            }
+
+            .header-actions {
+                margin-bottom: 1.5rem;
+            }
+
+            /* Back Button */
+            .btn-back {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                color: #6b7280;
+                text-decoration: none;
+                font-weight: 500;
+                font-size: 0.95rem;
+                padding: 8px 12px;
+                border-radius: 8px;
+                transition: all 0.2s ease;
+                background: transparent;
+            }
+            .btn-back:hover {
+                color: #111827;
+                background: #f3f4f6;
+            }
+
+            /* Main Card */
+            .connections-card {
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+                border: 1px solid #e5e7eb;
+                overflow: hidden;
+            }
+
+            .card-header {
+                padding: 32px 32px 24px;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            .card-header h1 {
+                font-size: 1.5rem;
+                font-weight: 700;
+                color: #111827;
+                margin: 0 0 8px 0;
+            }
+
+            .card-header p {
+                color: #6b7280;
+                margin: 0;
+                font-size: 0.95rem;
+                line-height: 1.5;
+            }
+
+            /* Messages */
+            .messages-container {
+                padding: 16px 32px 0;
+            }
+            .alert-error {
+                background: #fee2e2;
+                color: #991b1b;
+                padding: 12px 16px;
+                border-radius: 8px;
+                font-size: 0.9rem;
+                border: 1px solid #fecaca;
+            }
+
+            /* Connected Accounts List */
+            .connections-list {
+                padding: 0;
+            }
+
+            .connection-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 24px 32px;
+                border-bottom: 1px solid #f3f4f6;
+                transition: background 0.15s;
+            }
+            .connection-item:hover {
+                background: #f9fafb;
+            }
+
+            .connection-info {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+            }
+
+            .provider-logo {
+                width: 48px;
+                height: 48px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 12px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            }
+            
+            .provider-logo img {
+                width: 24px;
+                height: 24px;
+            }
+            
+            .provider-text h3 {
+                margin: 0 0 4px 0;
+                font-size: 1rem;
+                font-weight: 600;
+                color: #111827;
+                text-transform: capitalize;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .badge-connected {
+                font-size: 0.75rem;
+                background: #dcfce7;
+                color: #166534;
+                padding: 2px 8px;
+                border-radius: 99px;
+                font-weight: 600;
+                border: 1px solid #bbf7d0;
+            }
+            
+            .provider-text p {
+                margin: 0;
+                font-size: 0.875rem;
+                color: #6b7280;
+            }
+
+            /* Buttons */
+            .btn-remove {
+                padding: 8px 16px;
+                background: white;
+                border: 1px solid #e5e7eb;
+                color: #ef4444;
+                border-radius: 8px;
+                font-size: 0.875rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .btn-remove:hover {
+                background: #fef2f2;
+                border-color: #fee2e2;
+                color: #dc2626;
+            }
+
+            /* Empty State */
+            .empty-state {
+                padding: 48px 32px;
+                text-align: center;
+                background: #fdfdfd;
+            }
+            .empty-icon {
+                width: 64px;
+                height: 64px;
+                background: #f3f4f6;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 16px;
+                color: #9ca3af;
+            }
+            .empty-state h3 {
+                font-size: 1.1rem;
+                font-weight: 600;
+                color: #374151;
+                margin: 0 0 8px 0;
+            }
+            .empty-state p {
+                color: #6b7280;
+                font-size: 0.95rem;
+                max-width: 300px;
+                margin: 0 auto;
+            }
+
+            /* Add New Section */
+            .add-new-section {
+                padding: 32px;
+                background: #fafafa;
+                border-top: 1px solid #e5e7eb;
+            }
+            .add-new-header {
+                margin-bottom: 20px;
+            }
+            .add-new-header h3 {
+                font-size: 1rem;
+                font-weight: 600;
+                color: #111827;
+                margin: 0 0 4px 0;
+            }
+            .add-new-header p {
+                font-size: 0.9rem;
+                color: #6b7280;
+                margin: 0;
+            }
+
+            /* Social Login Buttons (Google Style) */
+            .social-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+                width: 100%;
+                max-width: 400px;
+                padding: 12px;
+                background: white;
+                border: 1px solid #d1d5db;
+                border-radius: 8px;
+                color: #374151;
+                font-weight: 500;
+                text-decoration: none;
+                transition: all 0.2s;
+                font-size: 0.95rem;
+                margin: 0 auto;
+            }
+            .social-btn:hover {
+                background: #f9fafb;
+                border-color: #9ca3af;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            }
+            .social-btn.google-btn {
+                color: #3c4043;
+            }
+            
+            /* Providers Grid */
+            .providers-grid {
+                display: grid;
+                gap: 12px;
+            }
+        </style>
+
+        {% if form.errors %}
+        <div class="messages-container">
+            <div class="alert-error">
+                {{ form.non_field_errors }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if user.socialaccount_set.all %}
+            <form method="post" action="{% url 'socialaccount_connections' %}">
+                {% csrf_token %}
+                <div class="connections-list">
+                    {% for socialaccount in user.socialaccount_set.all %}
+                        <div class="connection-item">
+                            <div class="connection-info">
+                                <div class="provider-logo">
+                                    {% if socialaccount.provider == "google" %}
+                                        <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+                                    {% else %}
+                                        <span style="font-weight: 700; color: #4b5563; font-size: 14px;">{{ socialaccount.provider|first|upper }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="provider-text">
+                                    <h3>
+                                        {{ socialaccount.provider|title }}
+                                        <span class="badge-connected">Connected</span>
+                                    </h3>
+                                    <p>{% trans "Connected as" %} {{ socialaccount.extra_data.email }}</p>
+                                </div>
+                            </div>
+                            <button type="submit" name="account" value="{{ socialaccount.id }}" class="btn-remove" onclick="return confirm('{% trans "Are you sure you want to disconnect this account?" %}')">
+                                {% trans "Disconnect" %}
+                            </button>
                         </div>
-                        <div class="connection-details">
-                            <h3>
-                                {% if socialaccount.provider == "google-oauth2" %}
-                                    Google
-                                {% else %}
-                                    {{ socialaccount.get_provider.name }}
-                                {% endif %}
-                            </h3>
-                            <p>{{ socialaccount.extra_data.email }}</p>
-                        </div>
-                    </div>
-                    <div class="connection-actions">
-                        <a href="{% url 'socialaccount_connections' %}" class="btn btn-danger" onclick="return confirm('Are you sure you want to remove this connection?')">
-                            {% trans "Remove" %}
-                        </a>
-                    </div>
+                    {% endfor %}
                 </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <div class="empty-state">
-            <p>{% trans "You have not added any third-party account connections yet." %}</p>
-        </div>
-    {% endif %}
+            </form>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                </div>
+                <h3>{% trans "No Accounts Connected" %}</h3>
+                <p>{% trans "You haven't linked any external accounts yet." %}</p>
+            </div>
+        {% endif %}
 
-    <div class="add-connection-section">
-        <h3>{% trans "Add a Third-Party Account" %}</h3>
-        <p style="margin-bottom: 1rem;">{% trans "Connect an additional third-party account to your account for easier sign-in." %}</p>
-        
-        <div class="providers-list">
-            {% for provider in socialaccount_providers %}
-                <a href="{% provider_login_url provider.id process='connect' %}" class="provider-button">
-                    {% if provider.id == 'google' %}
-                        Google
-                    {% else %}
-                        {{ provider.name }}
-                    {% endif %}
-                </a>
-            {% endfor %}
+        <div class="add-new-section">
+            <div class="add-new-header">
+                <h3>{% trans "Add a Connection" %}</h3>
+                <p>{% trans "Select a provider below to connect your account." %}</p>
+            </div>
+            
+            <div class="providers-grid">
+                {% get_providers as socialaccount_providers %}
+                {% for provider in socialaccount_providers %}
+                    <a href="{% provider_login_url provider.id process='connect' %}" class="social-btn google-btn">
+                        {% if provider.id == 'google' %}
+                            <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+                            Connect Google
+                        {% else %}
+                            {{ provider.name }}
+                        {% endif %}
+                    </a>
+                {% endfor %}
+            </div>
         </div>
     </div>
 </div>
