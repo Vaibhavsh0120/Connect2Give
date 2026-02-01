@@ -1,8 +1,7 @@
 /**
  * Volunteer Pickups & Delivery Management
  * Handles donation acceptance, delivery routing, live tracking, and map display
- * 
- * ARCHITECTURE:
+ * * ARCHITECTURE:
  * - Pickup Map (Mode A): Multi-stop TSP route from volunteer -> restaurants
  * - Delivery Map (Mode B): Simple route from volunteer -> nearest camp
  * Both maps use separate instances to avoid conflicts
@@ -184,10 +183,10 @@ function hideAllPickupMode() {
  */
 function calculateOptimizedRoute() {
     const btn = document.getElementById('calculate-route-btn');
-    if (!btn) return;
-    
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading-spinner"></span> Calculating...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner"></span> Calculating...';
+    }
     
     // Get current GPS position if available
     const requestBody = {};
@@ -218,11 +217,13 @@ function calculateOptimizedRoute() {
         showToast('An error occurred. Please try again.', 'error');
     })
     .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-            <circle cx="12" cy="10" r="3"/>
-        </svg> Recalculate Route`;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+            </svg> Recalculate Route`;
+        }
     });
 }
 
@@ -283,6 +284,7 @@ function displayPickupRoute(data) {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickupMapInstance);
     
     // Ensure map renders correctly after container becomes visible
+    // CRITICAL: This fixes "map not rendering"
     console.log('[v0] Map initialized, waiting for rendering');
     setTimeout(() => {
         console.log('[v0] Invalidating map size');
@@ -297,75 +299,32 @@ function displayPickupRoute(data) {
     // Create waypoints from route data
     const waypoints = data.route.map(loc => L.latLng(loc.lat, loc.lon));
     
-    // Check if Leaflet Routing Machine is available
-    if (typeof L.Routing !== 'undefined') {
-        // Clear existing routing control
-        if (pickupRoutingControl) {
-            pickupMapInstance.removeControl(pickupRoutingControl);
+    // --- TEMPORARILY DISABLED ROUTING PATH (User Request) ---
+    // Instead, we just add markers and fit bounds manually so map shows
+    
+    // 1. Add Markers manually
+    data.route.forEach((loc, index) => {
+        if (index === 0) {
+            // Volunteer marker
+            volunteerPickupMarker = L.marker([loc.lat, loc.lon], { 
+                icon: bikeIcon,
+                zIndexOffset: 1000
+            }).addTo(pickupMapInstance);
+        } else {
+            // Restaurant markers
+            L.marker([loc.lat, loc.lon], { 
+                icon: createRestaurantIcon(index) 
+            }).addTo(pickupMapInstance).bindPopup(`<strong>Stop ${index}: ${loc.name}</strong>`);
         }
-        
-        // Add routing with road path
-        pickupRoutingControl = L.Routing.control({
-            waypoints: waypoints,
-            routeWhileDragging: false,
-            show: false, // Hide turn-by-turn instructions
-            addWaypoints: false,
-            fitSelectedRoutes: true,
-            createMarker: function(i, waypoint) {
-                const loc = data.route[i];
-                if (i === 0) {
-                    // Volunteer marker
-                    volunteerPickupMarker = L.marker(waypoint.latLng, { 
-        icon: bikeIcon,
-        zIndexOffset: 1000
     });
-                    return volunteerPickupMarker;
-                } else {
-                    // Restaurant markers with order numbers
-                    return L.marker(waypoint.latLng, { 
-                        icon: createRestaurantIcon(i) 
-                    }).bindPopup(`<strong>Stop ${i}: ${loc.name}</strong>`);
-                }
-            },
-            lineOptions: {
-                styles: [{ color: '#10b981', weight: 5, opacity: 0.8 }]
-            }
-        }).addTo(pickupMapInstance);
-        
-        // Handle route found event
-        pickupRoutingControl.on('routesfound', function(e) {
-            // Update distance/time with actual road values if available
-            if (e.routes && e.routes[0]) {
-                const summary = e.routes[0].summary;
-                const actualDistance = (summary.totalDistance / 1000).toFixed(2);
-                const actualTime = Math.round(summary.totalTime / 60);
-                
-                if (distanceEl) distanceEl.textContent = actualDistance;
-                if (timeEl) timeEl.textContent = actualTime;
-            }
-        });
-    } else {
-        // Fallback: Add markers without routing
-        data.route.forEach((loc, index) => {
-            if (index === 0) {
-                volunteerPickupMarker = L.marker([loc.lat, loc.lon], { 
-        icon: bikeIcon,
-        zIndexOffset: 1000
-    }).addTo(pickupMapInstance);
-            } else {
-                L.marker([loc.lat, loc.lon], { 
-                    icon: createRestaurantIcon(index) 
-                }).addTo(pickupMapInstance).bindPopup(`<strong>Stop ${index}: ${loc.name}</strong>`);
-            }
-        });
-        
-        // Draw simple polyline connecting all points
-        const latlngs = data.route.map(loc => [loc.lat, loc.lon]);
-        L.polyline(latlngs, { color: '#10b981', weight: 4, opacity: 0.8 }).addTo(pickupMapInstance);
-        
-        // Fit bounds
-        pickupMapInstance.fitBounds(latlngs, { padding: [30, 30] });
+
+    // 2. Fit Bounds so map is centered correctly
+    if (waypoints.length > 0) {
+        const bounds = L.latLngBounds(waypoints);
+        pickupMapInstance.fitBounds(bounds, { padding: [50, 50] });
     }
+    
+    // --- END OF MANUAL MAP SETUP ---
     
     // Show live tracking indicator
     const trackingStatus = document.getElementById('live-tracking-status');

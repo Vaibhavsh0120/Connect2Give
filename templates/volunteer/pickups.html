@@ -56,33 +56,8 @@
         height: 400px;
         width: 100%;
     }
-    .map-legend {
-        position: absolute;
-        bottom: 12px;
-        left: 12px;
-        background: white;
-        padding: 12px 16px;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        z-index: 1000;
-        font-size: 0.8rem;
-    }
-    .map-legend-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 6px;
-    }
-    .map-legend-item:last-child {
-        margin-bottom: 0;
-    }
-    .legend-marker {
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        border: 2px solid white;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-    }
+    
+    /* LEGEND REMOVED HERE as requested */
 
     /* Route Info Banner */
     .route-info-banner {
@@ -112,28 +87,6 @@
     .route-info-banner .route-detail-label {
         font-size: 0.8rem;
         opacity: 0.9;
-    }
-
-    /* Info Banner */
-    .info-banner {
-        background: #eff6ff;
-        border: 1px solid #3b82f6;
-        border-radius: 12px;
-        padding: 16px 20px;
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    .info-banner svg {
-        width: 24px;
-        height: 24px;
-        color: #2563eb;
-        flex-shrink: 0;
-    }
-    .info-banner p {
-        margin: 0;
-        color: #1e40af;
     }
 
     /* Pickup List */
@@ -299,16 +252,6 @@
     {# TSP Map - Always shown when there are active pickups #}
     <div class="pickup-map-container" id="pickup-map-container">
         <div id="pickup-route-map"></div>
-        <div class="map-legend">
-            <div class="map-legend-item">
-                <div class="legend-marker" style="background: #10b981;"></div>
-                <span>Your Location</span>
-            </div>
-            <div class="map-legend-item">
-                <div class="legend-marker" style="background: #3b82f6;"></div>
-                <span>Restaurant Pickup</span>
-            </div>
-        </div>
     </div>
 
     {# Route Info Banner (shown when map is active) #}

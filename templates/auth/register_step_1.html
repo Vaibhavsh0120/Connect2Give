@@ -7,6 +7,68 @@
     <title>Register - Connect2Give</title>
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+    <style>
+        /* Modern Password Styling from force_password_change */
+        .security-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #f0f9ff;
+            border-left: 4px solid #0284c7;
+            border-radius: 6px;
+            margin-bottom: 24px;
+            font-size: 14px;
+            color: #0c4a6e;
+        }
+        .security-badge svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+        .password-strength {
+            margin-top: 8px;
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .password-strength-bar {
+            height: 100%;
+            transition: all 0.3s ease;
+            width: 0%;
+        }
+        .password-strength-bar.weak { 
+            width: 33%; 
+            background: #ef4444; 
+        }
+        .password-strength-bar.medium { 
+            width: 66%; 
+            background: #f59e0b; 
+        }
+        .password-strength-bar.strong { 
+            width: 100%; 
+            background: #10b981; 
+        }
+        .requirements {
+            margin-top: 16px;
+            font-size: 13px;
+        }
+        .requirement {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            color: #6b7280;
+        }
+        .requirement.met {
+            color: #10b981;
+        }
+        .requirement svg {
+            width: 16px;
+            height: 16px;
+        }
+    </style>
 </head>
 <body>
     <div class="auth-page-wrapper">
@@ -38,6 +100,13 @@
                     <span>or register with email</span>
                 </div>
 
+                <div class="security-badge">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M5.338 1.59a61.44 61.44 0 0 0-2.837.856.481.481 0 0 0-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.725 10.725 0 0 0 2.287 2.233c.346.244.652.42.893.5.12.038.262.044.391.04a6.6 6.6 0 0 0 1.579-.125 6.56 6.56 0 0 0 1.318-.398l.3-.1a6.556 6.556 0 0 0 1.852-1.188c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.856C9.662 1.341 8.778.26 8 .26s-1.662 1.08-2.662 1.33Z"/>
+                    </svg>
+                    Secure your account with a strong password
+                </div>
+
                 <form action="{% url 'register_step_1' %}" method="POST" onsubmit="return validatePassword()">
                     {% csrf_token %}
                     
@@ -54,7 +123,16 @@
                     <div class="form-group">
                         <label for="password">Password</label>
                         <div class="password-wrapper">
-                            <input type="password" name="password" id="password" required autocomplete="new-password" minlength="8">
+                            <input 
+                                type="password" 
+                                name="password" 
+                                id="password" 
+                                required 
+                                minlength="8"
+                                autocomplete="new-password"
+                                onchange="checkPasswordStrength()"
+                                oninput="checkPasswordStrength()"
+                            >
                             <button type="button" class="password-toggle" onclick="togglePassword('password', this)">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
                                     <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>
@@ -62,7 +140,32 @@
                                 </svg>
                             </button>
                         </div>
-                        <small style="color: #64748b; font-size: 0.85rem;">Minimum 8 characters</small>
+                        <div class="password-strength">
+                            <div class="password-strength-bar" id="strength-bar"></div>
+                        </div>
+                        <div class="requirements">
+                            <div class="requirement" id="req-length">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05L10.985 7.07a.75.75 0 0 1-1.079.02L8.22 5.897a.75.75 0 1 1 1.06-1.06l1.688 1.688.97-.97Z"/>
+                                    <path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8Zm15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0Z"/>
+                                </svg>
+                                At least 8 characters
+                            </div>
+                            <div class="requirement" id="req-upper">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05L10.985 7.07a.75.75 0 0 1-1.079.02L8.22 5.897a.75.75 0 1 1 1.06-1.06l1.688 1.688.97-.97Z"/>
+                                    <path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8Zm15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0Z"/>
+                                </svg>
+                                One uppercase letter
+                            </div>
+                            <div class="requirement" id="req-number">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05L10.985 7.07a.75.75 0 0 1-1.079.02L8.22 5.897a.75.75 0 1 1 1.06-1.06l1.688 1.688.97-.97Z"/>
+                                    <path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8Zm15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0Z"/>
+                                </svg>
+                                One number
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="form-group">
@@ -115,6 +218,46 @@
             }
         }
 
+        function checkPasswordStrength() {
+            const password = document.getElementById('password').value;
+            const bar = document.getElementById('strength-bar');
+            
+            let strength = 0;
+            
+            // Check length
+            if (password.length >= 8) {
+                strength++;
+                document.getElementById('req-length').classList.add('met');
+            } else {
+                document.getElementById('req-length').classList.remove('met');
+            }
+            
+            // Check uppercase
+            if (/[A-Z]/.test(password)) {
+                strength++;
+                document.getElementById('req-upper').classList.add('met');
+            } else {
+                document.getElementById('req-upper').classList.remove('met');
+            }
+            
+            // Check number
+            if (/[0-9]/.test(password)) {
+                strength++;
+                document.getElementById('req-number').classList.add('met');
+            } else {
+                document.getElementById('req-number').classList.remove('met');
+            }
+            
+            bar.className = 'password-strength-bar';
+            if (strength === 1) {
+                bar.classList.add('weak');
+            } else if (strength === 2) {
+                bar.classList.add('medium');
+            } else if (strength === 3) {
+                bar.classList.add('strong');
+            }
+        }
+
         // Real-time password matching validation
         const pass1 = document.getElementById('password');
         const pass2 = document.getElementById('password2');
@@ -133,11 +276,21 @@
 
         pass1.addEventListener('input', checkPasswords);
         pass2.addEventListener('input', checkPasswords);
+        
+        // Initial check on load
+        document.addEventListener('DOMContentLoaded', checkPasswordStrength);
 
         function validatePassword() {
             if (!checkPasswords()) {
                 return false;
             }
+            // Optional: enforce strength before submitting
+            // const metRequirements = document.querySelectorAll('.requirement.met').length;
+            // if (metRequirements < 3) {
+            //     alert('Please choose a stronger password.');
+            //     return false;
+            // }
+            
             submitBtn.classList.add('loading');
             submitBtn.disabled = true;
             return true;
