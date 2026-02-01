@@ -2,6 +2,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import JsonResponse
 import json
 from ..models import Donation, DonationCamp, RestaurantProfile, VolunteerProfile
 from ..forms import DonationForm, RestaurantProfileForm
@@ -44,7 +45,13 @@ def restaurant_donations(request):
             donation = form.save(commit=False)
             donation.restaurant = restaurant_profile
             donation.save()
-            messages.success(request, 'New donation posted successfully!')
+            
+            # Check if it's an AJAX request
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': 'New donation posted successfully!'
+                })
             
             # Send webpush notifications
             try:

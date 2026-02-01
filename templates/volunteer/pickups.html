@@ -51,18 +51,10 @@
         margin-bottom: 1.5rem;
         border: 1px solid #e5e7eb;
         position: relative;
-        height: 380px;
-        width: 100%;
-        display: block;
-        z-index: 1;
     }
     #pickup-route-map {
-        height: 380px;
+        height: 400px;
         width: 100%;
-        display: block;
-        background: #f3f4f6;
-        position: relative;
-        z-index: 1;
     }
     .map-legend {
         position: absolute;
@@ -307,6 +299,16 @@
     {# TSP Map - Always shown when there are active pickups #}
     <div class="pickup-map-container" id="pickup-map-container">
         <div id="pickup-route-map"></div>
+        <div class="map-legend">
+            <div class="map-legend-item">
+                <div class="legend-marker" style="background: #10b981;"></div>
+                <span>Your Location</span>
+            </div>
+            <div class="map-legend-item">
+                <div class="legend-marker" style="background: #3b82f6;"></div>
+                <span>Restaurant Pickup</span>
+            </div>
+        </div>
     </div>
 
     {# Route Info Banner (shown when map is active) #}
@@ -359,14 +361,17 @@
     </div>
 
     {# Deliver to Camp Button - Only show if ALL items are COLLECTED #}
-    <div id="delivery-button-container" style="display: none; margin-top: 1.5rem; text-align: center;">
-        <button class="btn-primary-action" id="deliver-btn" onclick="proceedToDelivery()" style="font-size: 1.1rem; padding: 14px 32px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M5 12h14"/>
-                <path d="m12 5 7 7-7 7"/>
-            </svg>
-            Deliver to Camp
-        </button>
+    <div id="delivery-button-container" style="display: none; margin-top: 1.5rem;">
+        <div style="background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 12px; padding: 20px; text-align: center;">
+            <p style="margin: 0 0 16px 0; color: #065f46; font-weight: 500;">All items have been collected! Ready to deliver?</p>
+            <button class="btn-primary-action" id="deliver-btn" onclick="proceedToDelivery()" style="font-size: 1.1rem; padding: 14px 32px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14"/>
+                    <path d="m12 5 7 7-7 7"/>
+                </svg>
+                Deliver to Camp
+            </button>
+        </div>
     </div>
 </div>
 {% else %}

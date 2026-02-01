@@ -53,7 +53,7 @@ def volunteer_dashboard(request):
 @user_type_required('VOLUNTEER')
 def volunteer_pickups(request):
     """
-    View for "My Pickups" - Manage donations in ACCEPTED status
+    View for "My Pickups" - Manage donations in ACCEPTED and COLLECTED status
     Shows restaurants to pick up from and allows marking items as collected
     """
     volunteer_profile = request.user.volunteer_profile
@@ -64,10 +64,10 @@ def volunteer_pickups(request):
         status='PENDING', assigned_volunteer=None, accepted_at=None
     )
 
-    # Get active pickups (ACCEPTED donations)
+    # Get active pickups (ACCEPTED or COLLECTED donations)
     active_donations = Donation.objects.filter(
         assigned_volunteer=volunteer_profile, 
-        status='ACCEPTED'
+        status__in=['ACCEPTED', 'COLLECTED']
     ).select_related('restaurant').order_by('accepted_at')
     
     # Get available donations for new pickups
@@ -225,8 +225,6 @@ def volunteer_manage_pickups(request):
         return redirect('volunteer_pickups')
 
 
-
-
 @login_required(login_url='login_page')
 @user_type_required('VOLUNTEER')
 def volunteer_profile(request):
@@ -271,36 +269,6 @@ def volunteer_settings(request):
 
 
 # --- ACTION VIEWS ---
-
-@login_required(login_url='login_page')
-@user_type_required('VOLUNTEER')
-def register_with_ngo(request, ngo_id):
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'message': 'Invalid request.'}, status=400)
-    
-    try:
-        ngo = get_object_or_404(NGOProfile, pk=ngo_id)
-        volunteer = request.user.volunteer_profile
-        ngo.volunteers.add(volunteer)
-        return JsonResponse({'success': True, 'message': f'Successfully registered with {ngo.ngo_name}.'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': 'An unexpected error occurred.'}, status=500)
-
-
-@login_required(login_url='login_page')
-@user_type_required('VOLUNTEER')
-def unregister_from_ngo(request, ngo_id):
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'message': 'Invalid request.'}, status=400)
-        
-    try:
-        ngo = get_object_or_404(NGOProfile, pk=ngo_id)
-        volunteer = request.user.volunteer_profile
-        ngo.volunteers.remove(volunteer)
-        return JsonResponse({'success': True, 'message': f'Successfully unregistered from {ngo.ngo_name}.'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': 'An unexpected error occurred.'}, status=500)
-
 
 @login_required(login_url='login_page')
 @user_type_required('VOLUNTEER')
@@ -396,41 +364,52 @@ def mark_as_delivered(request, camp_id):
     Sets status to VERIFICATION_PENDING for NGO approval (Trust Protocol).
     """
     if request.method != 'POST': 
-        return redirect('index')
+        return JsonResponse({'success': False, 'message': 'Invalid request.'}, status=400)
     
-    volunteer_profile = request.user.volunteer_profile
-    
-    # Guard Logic: Check for uncollected items (accepted but not collected)
-    uncollected_count = Donation.objects.filter(
-        assigned_volunteer=volunteer_profile,
-        status='ACCEPTED'
-    ).count()
-    
-    if uncollected_count > 0:
-        messages.error(request, f'Cannot deliver yet. You have {uncollected_count} item(s) still marked as "Accepted" but not collected.')
-        return redirect('volunteer_manage_pickups')
-    
-    # Only deliver COLLECTED donations
-    donations = Donation.objects.filter(
-        assigned_volunteer=volunteer_profile, 
-        status='COLLECTED'
-    )
-    camp = get_object_or_404(DonationCamp, pk=camp_id)
-    
-    updated_count = 0
-    for donation in donations:
-        donation.status = 'VERIFICATION_PENDING'  # Trust Protocol: Requires NGO verification
-        donation.target_camp = camp
-        donation.delivered_at = timezone.now()
-        donation.save()
-        updated_count += 1
+    try:
+        volunteer_profile = request.user.volunteer_profile
         
-    if updated_count > 0:
-        messages.success(request, f'{updated_count} item(s) marked as delivered and are pending verification by {camp.ngo.ngo_name}.')
-    else:
-        messages.warning(request, 'You had no collected pickups to deliver. Collect items first.')
-
-    return redirect('volunteer_manage_pickups')
+        # Guard Logic: Check for uncollected items (accepted but not collected)
+        uncollected_count = Donation.objects.filter(
+            assigned_volunteer=volunteer_profile,
+            status='ACCEPTED'
+        ).count()
+        
+        if uncollected_count > 0:
+            return JsonResponse({
+                'success': False, 
+                'message': f'Cannot deliver yet. You have {uncollected_count} item(s) still marked as "Accepted" but not collected.'
+            }, status=400)
+        
+        # Only deliver COLLECTED donations
+        donations = Donation.objects.filter(
+            assigned_volunteer=volunteer_profile, 
+            status='COLLECTED'
+        )
+        camp = get_object_or_404(DonationCamp, pk=camp_id)
+        
+        updated_count = 0
+        with transaction.atomic():
+            for donation in donations:
+                donation.status = 'VERIFICATION_PENDING'  # Trust Protocol: Requires NGO verification
+                donation.target_camp = camp
+                donation.delivered_at = timezone.now()
+                donation.save()
+                updated_count += 1
+        
+        if updated_count > 0:
+            return JsonResponse({
+                'success': True, 
+                'message': f'{updated_count} item(s) marked as delivered and are pending verification by {camp.ngo.ngo_name}.'
+            })
+        else:
+            return JsonResponse({
+                'success': False, 
+                'message': 'You had no collected pickups to deliver. Collect items first.'
+            }, status=400)
+    except Exception as e:
+        print(f"Error in mark_as_delivered: {e}")
+        return JsonResponse({'success': False, 'message': 'An error occurred.'}, status=500)
 
 @login_required(login_url='login_page')
 @user_type_required('VOLUNTEER')
@@ -748,4 +727,56 @@ def get_volunteer_stats(request):
         return JsonResponse({
             'success': False,
             'message': str(e)
+        }, status=500)
+
+
+@login_required(login_url='login_page')
+@user_type_required('VOLUNTEER')
+def get_nearest_camp(request):
+    """API endpoint to get the nearest active camp for delivery"""
+    try:
+        volunteer_profile = request.user.volunteer_profile
+        
+        # Get registered NGOs
+        registered_ngos = volunteer_profile.registered_ngos.all()
+        
+        if not registered_ngos.exists():
+            return JsonResponse({
+                'success': False,
+                'message': 'You must be registered with at least one NGO to deliver.',
+                'camp_id': None
+            }, status=400)
+        
+        # Get active camps from registered NGOs
+        active_camps = DonationCamp.objects.filter(
+            ngo__in=registered_ngos,
+            is_active=True
+        ).order_by('-created_at')
+        
+        if not active_camps.exists():
+            return JsonResponse({
+                'success': False,
+                'message': 'No active camps available right now. Please try again later.',
+                'camp_id': None
+            }, status=400)
+        
+        # For now, return the first active camp (nearest will be calculated on map in deliveries view)
+        nearest_camp = active_camps.first()
+        
+        return JsonResponse({
+            'success': True,
+            'camp_id': nearest_camp.pk,
+            'camp_name': nearest_camp.name,
+            'ngo_name': nearest_camp.ngo.ngo_name,
+            'latitude': nearest_camp.latitude,
+            'longitude': nearest_camp.longitude,
+            'address': nearest_camp.location_address
+        })
+    
+    except Exception as e:
+        print(f"Error in get_nearest_camp: {e}")
+        return JsonResponse({
+            'success': False,
+            'message': 'An error occurred.',
+            'camp_id': None
         }, status=500)

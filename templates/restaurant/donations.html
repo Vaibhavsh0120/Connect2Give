@@ -7,12 +7,6 @@
 {% block page_description %}Create new donations and view your history.{% endblock %}
 
 {% block restaurant_content %}
-    {% if messages %}
-        {% for message in messages %}
-            <div class="success-message">{{ message }}</div>
-        {% endfor %}
-    {% endif %}
-
     <!-- Tabbed navigation interface -->
     <div class="tab-navigation">
         <button class="tab-button active" onclick="switchTab(event, 'create-donation')">Create Donation</button>
@@ -23,7 +17,7 @@
     <div id="create-donation" class="tab-content active">
         <div class="content-card">
             <h3>Post a New Food Donation</h3>
-            <form method="POST" action="{% url 'restaurant_donations' %}">
+            <form id="donation-form" method="POST" action="{% url 'restaurant_donations' %}" onsubmit="submitDonationForm(event)">
                 {% csrf_token %}
                 <div class="form-group">
                     {{ form.food_description.label_tag }}
@@ -46,7 +40,7 @@
                         <p id="location-status" class="form-help-text"></p>
                     </div>
                 </div>
-                <button type="submit">Post Donation</button>
+                <button type="submit" id="submit-btn">Post Donation</button>
             </form>
         </div>
     </div>
@@ -83,7 +77,6 @@
 
 {% block scripts %}
 {{ block.super }}
-<script src="{% static 'js/common.js' %}"></script>
 <script>
     // Tab switching functionality
     function switchTab(event, tabId) {
@@ -92,17 +85,6 @@
         document.getElementById(tabId).classList.add('active');
         event.currentTarget.classList.add('active');
     }
-    
-    // Show success toast on page load if messages exist
-    document.addEventListener('DOMContentLoaded', function() {
-        const messages = document.querySelectorAll('.success-message');
-        if (messages.length > 0) {
-            messages.forEach(msg => {
-                showToast(msg.textContent, 'success');
-                msg.style.display = 'none';
-            });
-        }
-    });
 
     // Function to use the default address
     function useDefaultAddress() {
@@ -154,6 +136,48 @@
                 status.style.color = 'var(--accent-red)';
             }
         );
+    }
+
+    // AJAX form submission to avoid double toast messages
+    function submitDonationForm(event) {
+        event.preventDefault();
+        
+        const form = document.getElementById('donation-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const formData = new FormData(form);
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Posting...';
+        
+        fetch(form.action, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                form.reset();
+                
+                // Refresh the donations list
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            } else {
+                showToast(data.message || 'Failed to post donation', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Post Donation';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('An error occurred', 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Post Donation';
+        });
     }
 </script>
 {% endblock scripts %}

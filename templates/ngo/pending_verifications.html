@@ -109,17 +109,7 @@
     .donation-details .label {
         font-weight: 500;
         color: #6b7280;
-    }
-    
-    .trust-score-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 500;
-    }
+  }
     .trust-score-badge.high {
         background: #d1fae5;
         color: #065f46;
@@ -255,13 +245,6 @@
                             <h4>{{ donation.assigned_volunteer.full_name }}</h4>
                             <p>Delivered {{ donation.delivered_at|timesince }} ago</p>
                         </div>
-                        {% with trust_score=donation.assigned_volunteer.trust_score %}
-                        {% if trust_score %}
-                            <span class="trust-score-badge {% if trust_score.trust_score >= 80 %}high{% elif trust_score.trust_score >= 50 %}medium{% else %}low{% endif %}">
-                                Trust: {{ trust_score.trust_score|floatformat:0 }}%
-                            </span>
-                        {% endif %}
-                        {% endwith %}
                     </div>
                     
                     {# Donation Details #}

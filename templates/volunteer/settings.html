@@ -1,5 +1,6 @@
 {% extends 'volunteer/base.html' %}
 {% load static %}
+{% load socialaccount %}
 
 {% block title %}Account Settings - {{ block.super }}{% endblock %}
 
@@ -116,7 +117,9 @@
     <h3>Account Security</h3>
     <p>Manage how you sign in to your account.</p>
     
-    {% if user.has_usable_password and user.social_auth.count > 0 %}
+    {% with has_google_auth=user.socialauth_set.filter|dictsort:"provider"|length %}
+    
+    {% if user.has_usable_password and has_google_auth > 0 %}
         {# User has both email/password and Google auth #}
         <div class="settings-row">
             <div class="settings-info">
@@ -128,17 +131,21 @@
             </div>
         </div>
         
-        <div class="settings-row">
-            <div class="settings-info">
-                <strong>Google Account</strong>
-                <small>{{ user.email }}</small>
+        {% for social_account in user.socialauth_set.all %}
+            {% if social_account.provider == "google-oauth2" %}
+            <div class="settings-row">
+                <div class="settings-info">
+                    <strong>Google Account</strong>
+                    <small>{{ social_account.extra_data.email }}</small>
+                </div>
+                <div class="settings-action">
+                    <button class="btn-action danger" onclick="confirmUnlinkGoogle()">Unlink</button>
+                </div>
             </div>
-            <div class="settings-action">
-                <button class="btn-action danger" onclick="confirmUnlinkGoogle()">Unlink</button>
-            </div>
-        </div>
+            {% endif %}
+        {% endfor %}
     
-    {% elif user.has_usable_password and user.social_auth.count == 0 %}
+    {% elif user.has_usable_password and has_google_auth == 0 %}
         {# User only has email/password #}
         <div class="settings-row">
             <div class="settings-info">
@@ -156,25 +163,29 @@
                 <small>Add an extra sign-in method for convenience</small>
             </div>
             <div class="settings-action">
-                <a href="#" class="btn-action primary">Link Google</a>
+                <a href="{% provider_login_url 'google' process='connect' %}" class="btn-action primary">Link Google</a>
             </div>
         </div>
     
-    {% elif not user.has_usable_password and user.social_auth.count > 0 %}
+    {% elif not user.has_usable_password and has_google_auth > 0 %}
         {# User only has Google auth #}
         <div class="info-text">
             You signed up with Google. Set a password to be able to sign in with your email as well.
         </div>
         
-        <div class="settings-row">
-            <div class="settings-info">
-                <strong>Google Account</strong>
-                <small>{{ user.email }}</small>
+        {% for social_account in user.socialauth_set.all %}
+            {% if social_account.provider == "google-oauth2" %}
+            <div class="settings-row">
+                <div class="settings-info">
+                    <strong>Google Account</strong>
+                    <small>{{ social_account.extra_data.email }}</small>
+                </div>
+                <div class="settings-action">
+                    <button class="btn-action danger" onclick="confirmUnlinkGoogle()">Unlink</button>
+                </div>
             </div>
-            <div class="settings-action">
-                <button class="btn-action danger" onclick="confirmUnlinkGoogle()">Unlink</button>
-            </div>
-        </div>
+            {% endif %}
+        {% endfor %}
         
         <div class="settings-row">
             <div class="settings-info">
@@ -186,6 +197,8 @@
             </div>
         </div>
     {% endif %}
+    
+    {% endwith %}
 </div>
 
 {# Password Change Modal #}
@@ -303,25 +316,10 @@ function confirmUnlinkGoogle() {
             if (data.success) {
                 showToast('Google account unlinked successfully', 'success');
                 
-                // NO RELOAD: Update UI to show password-only mode
+                // Reload the page to show updated settings
                 setTimeout(() => {
-                    const settingsCard = document.querySelector('.settings-card');
-                    if (settingsCard) {
-                        // Reload just the security section via fetch
-                        fetch(window.location.href)
-                            .then(r => r.text())
-                            .then(html => {
-                                const parser = new DOMParser();
-                                const newDoc = parser.parseFromString(html, 'text/html');
-                                const newCard = newDoc.querySelector('.settings-card');
-                                if (newCard && settingsCard) {
-                                    settingsCard.innerHTML = newCard.innerHTML;
-                                    console.log('[v0] Settings card updated without reload');
-                                }
-                            })
-                            .catch(e => console.error('[v0] Error reloading settings:', e));
-                    }
-                }, 300);
+                    window.location.reload();
+                }, 1000);
             } else {
                 showToast(data.message || 'Failed to unlink Google account', 'error');
             }
@@ -368,28 +366,30 @@ function confirmDeleteAccount() {
     
     const csrftoken = getCookie('csrftoken');
     
-    fetch('{% url "delete_account" %}', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': csrftoken,
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showToast('Account deleted successfully', 'success');
-            setTimeout(() => {
-                window.location.href = '{% url "index" %}';
-            }, 1500);
-        } else {
-            showToast(data.message || 'Failed to delete account', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('[v0] Error:', error);
-        showToast('An error occurred', 'error');
-    });
+    // TODO: Implement delete account endpoint
+    showToast('Account deletion endpoint not yet implemented', 'error');
+    // fetch('/account/delete/', {
+    //     method: 'POST',
+    //     headers: {
+    //         'X-CSRFToken': csrftoken,
+    //         'Content-Type': 'application/json'
+    //     }
+    // })
+    // .then(response => response.json())
+    // .then(data => {
+    //     if (data.success) {
+    //         showToast('Account deleted successfully', 'success');
+    //         setTimeout(() => {
+    //             window.location.href = '{% url "index" %}';
+    //         }, 1500);
+    //     } else {
+    //         showToast(data.message || 'Failed to delete account', 'error');
+    //     }
+    // })
+    // .catch(error => {
+    //     console.error('[v0] Error:', error);
+    //     showToast('An error occurred', 'error');
+    // });
 }
 </script>
 {% endblock volunteer_content %}

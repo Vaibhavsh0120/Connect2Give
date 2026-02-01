@@ -2,7 +2,7 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
-from .views import verification_views, tracking_views
+from .views import verification_views, tracking_views, trust_score_views
 
 urlpatterns = [
     # --- Service Worker URL ---
@@ -48,8 +48,6 @@ urlpatterns = [
     path('account/link-google/', views.link_google_account, name='link_google_account'),
     path('account/unlink-google/', views.unlink_google_account, name='unlink_google_account'),
     path('account/set-password/', views.set_password_after_google, name='set_password_after_google'),
-    path('account/delete/', views.delete_account, name='delete_account'),
-    path('account/delete/', views.delete_account, name='delete_account'),
     
     # --- Restaurant Dashboard URLs ---
     path('dashboard/restaurant/', views.restaurant_dashboard, name='restaurant_dashboard'),
@@ -73,15 +71,16 @@ urlpatterns = [
     path('dashboard/volunteer/manage-pickups/', views.volunteer_manage_pickups, name='volunteer_manage_pickups'),  # Legacy redirect
     path('dashboard/volunteer/profile/', views.volunteer_profile, name='volunteer_profile'),
     path('dashboard/volunteer/settings/', views.volunteer_settings, name='volunteer_settings'),
+    # NOTE: volunteer_manage_camps removed - volunteers cannot self-register with NGOs
     
     # --- Route Optimization APIs ---
     path('api/calculate-pickup-route/', views.calculate_pickup_route, name='calculate_pickup_route'),
     path('api/calculate-delivery-route/', views.calculate_delivery_route, name='calculate_delivery_route'),
     path('api/volunteer-stats/', views.get_volunteer_stats, name='volunteer_stats'),
+    path('api/nearest-camp/', views.get_nearest_camp, name='get_nearest_camp'),
     
     # --- Action URLs ---
-    path('register_with_ngo/<int:ngo_id>/', views.register_with_ngo, name='register_with_ngo'),
-    path('unregister_from_ngo/<int:ngo_id>/', views.unregister_from_ngo, name='unregister_from_ngo'),
+    # NOTE: register_with_ngo and unregister_from_ngo removed - volunteers are only linked to their creating NGO
     path('donation/accept/<int:donation_id>/', views.accept_donation, name='accept_donation'),
     path('donation/collected/<int:donation_id>/', views.mark_as_collected, name='mark_as_collected'),
     path('donation/cancel-pickup/<int:donation_id>/', views.cancel_pickup, name='cancel_pickup'),
@@ -112,4 +111,10 @@ urlpatterns = [
     path('dashboard/ngo/volunteer-locations/', tracking_views.ngo_volunteer_locations, name='ngo_volunteer_locations'),
     path('api/get-volunteers-locations/', tracking_views.get_volunteers_locations_api, name='get_volunteers_locations_api'),
     path('volunteer/location-privacy/', tracking_views.volunteer_location_privacy_settings, name='volunteer_location_privacy'),
+    
+    # --- Trust Score & Verification Protocol URLs ---
+    path('dashboard/volunteer/trust-score/', trust_score_views.volunteer_trust_dashboard, name='volunteer_trust_dashboard'),
+    path('api/volunteer-verification-stats/', trust_score_views.volunteer_verification_stats, name='volunteer_verification_stats'),
+    path('dashboard/ngo/volunteer-trust-profiles/', trust_score_views.ngo_volunteer_trust_profiles, name='ngo_volunteer_trust_profiles'),
+    path('dashboard/ngo/verification-analytics/', trust_score_views.donation_verification_analytics, name='donation_verification_analytics'),
 ]

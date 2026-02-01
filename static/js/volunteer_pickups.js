@@ -81,84 +81,99 @@ document.addEventListener('DOMContentLoaded', function () {
     // Start live location tracking
     startLiveLocationTracking();
     
-    // Auto-calculate and display TSP route if there are active pickups
-    const pickupList = document.getElementById('pickup-list');
-    const pickupCards = pickupList ? pickupList.querySelectorAll('[data-donation-id]') : [];
-    
-    if (pickupCards.length > 0) {
-        console.log('[v0] Active pickups found:', pickupCards.length);
-        // Auto-trigger route calculation after ensuring DOM is fully ready
-        setTimeout(() => {
-            // Fetch the route from backend
-            fetch('/api/calculate-pickup-route/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    displayPickupRoute(data);
-                    console.log('[v0] TSP route auto-initialized');
-                } else {
-                    console.warn('[v0] Failed to auto-initialize route:', data.message);
-                }
-            })
-            .catch(error => {
-                console.error('[v0] Error auto-initializing route:', error);
-            });
-        }, 800);
-    }
-    
-    // Check if all pickups are already collected (on page load)
+    // Auto-initialize map on page load
     setTimeout(() => {
-        if (pickupCards.length > 0) {
-            const allCollected = Array.from(pickupCards).every(card => 
-                card.getAttribute('data-status') === 'collected'
-            );
-            if (allCollected) {
-                console.log('[v0] All items already collected on page load');
-                const deliveryBtn = document.getElementById('delivery-button-container');
-                if (deliveryBtn) {
-                    deliveryBtn.style.display = 'block';
-                    const mapContainer = document.getElementById('pickup-map-container');
-                    const infoBanner = document.getElementById('route-info-banner');
-                    if (mapContainer) mapContainer.style.display = 'none';
-                    if (infoBanner) infoBanner.style.display = 'none';
-                }
-            }
-        }
-    }, 1200);
-    
-    // Setup delegated event handlers for dynamically added buttons
-    setupDelegatedEventHandlers();
+        initializePickupMode();
+    }, 300);
 });
 
-// ============ DELEGATED EVENT HANDLERS ============
+/**
+ * Initialize Pickup Mode - handles all map logic and state management
+ */
+function initializePickupMode() {
+    const pickupList = document.getElementById('pickup-list');
+    if (!pickupList) return;
+    
+    const pickupCards = pickupList.querySelectorAll('[data-donation-id]');
+    console.log('[v0] Total pickup cards found:', pickupCards.length);
+    
+    if (pickupCards.length === 0) {
+        // No pickups at all
+        hideAllPickupMode();
+        return;
+    }
+    
+    // Filter pickups by status
+    const uncollectedPickups = Array.from(pickupCards).filter(card => 
+        card.getAttribute('data-status') !== 'collected'
+    );
+    const collectedPickups = Array.from(pickupCards).filter(card => 
+        card.getAttribute('data-status') === 'collected'
+    );
+    
+    console.log('[v0] Uncollected pickups:', uncollectedPickups.length, 'Collected pickups:', collectedPickups.length);
+    
+    if (uncollectedPickups.length > 0) {
+        // Scenario 1: Show map with route to uncollected restaurants
+        console.log('[v0] Scenario 1: There are uncollected pickups - showing map');
+        showPickupMapMode();
+    } else if (collectedPickups.length > 0) {
+        // Scenario 2: All collected, show delivery button
+        console.log('[v0] Scenario 2: All items collected - showing delivery button');
+        hidePickupMapMode();
+        showDeliveryButton();
+    } else {
+        // Scenario 3: No pickups
+        hideAllPickupMode();
+    }
+}
 
 /**
- * Setup delegated event handlers for dynamically added elements
- * This ensures Cancel buttons work even when added after page load
+ * Show pickup map mode - display map and calculate route
  */
-function setupDelegatedEventHandlers() {
-    // Delegated event handler for Cancel buttons
-    document.addEventListener('click', function(event) {
-        if (event.target.classList.contains('btn-cancel')) {
-            event.preventDefault();
-            event.stopPropagation();
-            // Find the donation ID from the button's ID
-            const match = event.target.id.match(/cancel-btn-(\d+)/);
-            if (match) {
-                const donationId = parseInt(match[1]);
-                cancelPickup(donationId);
-            }
-        }
-    });
+function showPickupMapMode() {
+    const mapContainer = document.getElementById('pickup-map-container');
+    const infoBanner = document.getElementById('route-info-banner');
+    const deliveryBtn = document.getElementById('delivery-button-container');
     
-    console.log('[v0] Delegated event handlers initialized');
+    if (mapContainer) mapContainer.style.display = 'block';
+    if (infoBanner) infoBanner.style.display = 'none'; // Will show after route is calculated
+    if (deliveryBtn) deliveryBtn.style.display = 'none';
+    
+    // Auto-calculate route
+    setTimeout(() => {
+        calculateOptimizedRoute();
+    }, 300);
+}
+
+/**
+ * Hide pickup map mode - remove map
+ */
+function hidePickupMapMode() {
+    const mapContainer = document.getElementById('pickup-map-container');
+    const infoBanner = document.getElementById('route-info-banner');
+    
+    if (mapContainer) mapContainer.style.display = 'none';
+    if (infoBanner) infoBanner.style.display = 'none';
+}
+
+/**
+ * Show delivery button mode
+ */
+function showDeliveryButton() {
+    const deliveryBtn = document.getElementById('delivery-button-container');
+    if (deliveryBtn) {
+        deliveryBtn.style.display = 'block';
+    }
+}
+
+/**
+ * Hide all pickup mode elements
+ */
+function hideAllPickupMode() {
+    hidePickupMapMode();
+    const deliveryBtn = document.getElementById('delivery-button-container');
+    if (deliveryBtn) deliveryBtn.style.display = 'none';
 }
 
 // ============ PICKUP MAP (Mode A - Multi-stop TSP) ============
@@ -267,13 +282,17 @@ function displayPickupRoute(data) {
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickupMapInstance);
     
-    // Critical: Force map to recalculate size after initialization
-    // This resolves issues where the container had wrong dimensions during map init
+    // Ensure map renders correctly after container becomes visible
+    console.log('[v0] Map initialized, waiting for rendering');
     setTimeout(() => {
-        if (pickupMapInstance) {
-            pickupMapInstance.invalidateSize(true); // true = animate, smooth resizing
-        }
-    }, 200);
+        console.log('[v0] Invalidating map size');
+        pickupMapInstance.invalidateSize(true);
+    }, 150);
+    
+    // Extra invalidation for stubborn rendering
+    setTimeout(() => {
+        pickupMapInstance.invalidateSize(true);
+    }, 500);
     
     // Create waypoints from route data
     const waypoints = data.route.map(loc => L.latLng(loc.lat, loc.lon));
@@ -297,9 +316,9 @@ function displayPickupRoute(data) {
                 if (i === 0) {
                     // Volunteer marker
                     volunteerPickupMarker = L.marker(waypoint.latLng, { 
-                        icon: bikeIcon, 
-                        zIndexOffset: 1000 
-                    }).bindPopup('<strong>Your Location</strong>');
+        icon: bikeIcon,
+        zIndexOffset: 1000
+    });
                     return volunteerPickupMarker;
                 } else {
                     // Restaurant markers with order numbers
@@ -330,9 +349,9 @@ function displayPickupRoute(data) {
         data.route.forEach((loc, index) => {
             if (index === 0) {
                 volunteerPickupMarker = L.marker([loc.lat, loc.lon], { 
-                    icon: bikeIcon, 
-                    zIndexOffset: 1000 
-                }).addTo(pickupMapInstance).bindPopup('<strong>Your Location</strong>');
+        icon: bikeIcon,
+        zIndexOffset: 1000
+    }).addTo(pickupMapInstance);
             } else {
                 L.marker([loc.lat, loc.lon], { 
                     icon: createRestaurantIcon(index) 
@@ -557,27 +576,9 @@ function markAsCollected(donationId) {
                 collectedCountEl.textContent = currentCount + 1;
             }
             
-            // PERSISTENT: Check if ALL pickups are collected
+            // Re-evaluate map visibility logic after marking as collected
             setTimeout(() => {
-                const allPickups = document.querySelectorAll('#pickup-list [data-donation-id]');
-                const allCollected = Array.from(allPickups).every(card => {
-                    return card.getAttribute('data-status') === 'collected';
-                });
-                
-                console.log('[v0] All collected?', allCollected, '- Total pickups:', allPickups.length);
-                
-                if (allCollected && allPickups.length > 0) {
-                    // Hide map and show delivery button
-                    const mapContainer = document.getElementById('pickup-map-container');
-                    const infoBanner = document.getElementById('route-info-banner');
-                    const deliveryBtn = document.getElementById('delivery-button-container');
-                    
-                    if (mapContainer) mapContainer.style.display = 'none';
-                    if (infoBanner) infoBanner.style.display = 'none';
-                    if (deliveryBtn) deliveryBtn.style.display = 'block';
-                    
-                    console.log('[v0] All items collected - showing delivery button');
-                }
+                initializePickupMode();
             }, 300);
         } else {
             collectBtn.disabled = false;
@@ -599,6 +600,8 @@ function markAsCollected(donationId) {
  * @param {number} donationId - ID of the donation to cancel
  */
 function cancelPickup(donationId) {
+    console.log('[v0] cancelPickup called for donation ID:', donationId);
+    
     if (!confirm('Are you sure you want to cancel this pickup? The donation will become available for other volunteers.')) {
         return;
     }
@@ -607,12 +610,17 @@ function cancelPickup(donationId) {
     const pickupCard = document.getElementById(`pickup-card-${donationId}`);
     const cancelBtn = document.getElementById(`cancel-btn-${donationId}`);
     
+    console.log('[v0] cancelBtn found:', !!cancelBtn, 'pickupCard found:', !!pickupCard);
+    
     if (cancelBtn) {
         cancelBtn.disabled = true;
         cancelBtn.textContent = 'Cancelling...';
     }
     
-    fetch(`/donation/cancel-pickup/${donationId}/`, {
+    const url = `/donation/cancel-pickup/${donationId}/`;
+    console.log('[v0] Sending POST request to:', url);
+    
+    fetch(url, {
         method: 'POST',
         headers: {
             'X-CSRFToken': csrftoken,
@@ -640,27 +648,10 @@ function cancelPickup(donationId) {
                         collectedCountEl.textContent = currentCount;
                     }
                     
-                    // FIXED: Refresh the map with new route (without all pickups)
-                    const remainingPickups = document.querySelectorAll('#pickup-list [data-donation-id]');
-                    console.log('[v0] Remaining pickups:', remainingPickups.length);
-                    
-                    if (remainingPickups.length > 0) {
-                        // Recalculate route without the cancelled item
-                        setTimeout(() => {
-                            calculateOptimizedRoute();
-                        }, 300);
-                    } else {
-                        // No more pickups - hide map and delivery button
-                        const mapContainer = document.getElementById('pickup-map-container');
-                        const infoBanner = document.getElementById('route-info-banner');
-                        const deliveryBtn = document.getElementById('delivery-button-container');
-                        
-                        if (mapContainer) mapContainer.style.display = 'none';
-                        if (infoBanner) infoBanner.style.display = 'none';
-                        if (deliveryBtn) deliveryBtn.style.display = 'none';
-                        
-                        console.log('[v0] No more pickups - hiding map');
-                    }
+                    // Re-evaluate map visibility logic after cancelling pickup
+                    setTimeout(() => {
+                        initializePickupMode();
+                    }, 300);
                 }, 300);
             }
         } else {
@@ -673,6 +664,7 @@ function cancelPickup(donationId) {
     })
     .catch(error => {
         console.error('[v0] Error cancelling pickup:', error);
+        console.log('[v0] Error details:', error.message);
         if (cancelBtn) {
             cancelBtn.disabled = false;
             cancelBtn.textContent = 'Cancel';
@@ -857,15 +849,85 @@ function unregisterFromNGO(ngoId) {
     });
 }
 
-// ============ DELIVERY NAVIGATION ============
-
 /**
- * Redirect to deliveries page once all pickups are collected
+ * Proceed to delivery - finds nearest camp and delivers all collected items
  */
 function proceedToDelivery() {
-    console.log('[v0] Proceeding to delivery page...');
-    // Navigate to the deliveries page
-    window.location.href = '/dashboard/volunteer/deliveries/';
+    console.log('[v0] Proceeding to delivery');
+    
+    // Fetch available camps and find the nearest one
+    fetch('/api/nearest-camp/', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.camp_id) {
+            // Found a camp, proceed with delivery
+            deliverToNearestCamp(data.camp_id);
+        } else {
+            showToast(data.message || 'No active camps found. Please register with an NGO first.', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('[v0] Error getting nearest camp:', error);
+        showToast('An error occurred. Please try again.', 'error');
+    });
+}
+
+/**
+ * Deliver to a specific camp via AJAX
+ */
+function deliverToNearestCamp(campId) {
+    const csrftoken = getCookie('csrftoken');
+    const deliverBtn = document.getElementById('deliver-btn');
+    
+    if (deliverBtn) {
+        deliverBtn.disabled = true;
+        deliverBtn.innerHTML = '<span style="display: inline-flex; align-items: center; gap: 8px;"><span style="display: inline-block; width: 12px; height: 12px; border: 2px solid white; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span> Delivering...</span>';
+    }
+    
+    fetch(`/donation/deliver/to/${campId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message || 'Delivered successfully!', 'success');
+            
+            // Redirect to deliveries page after a short delay
+            setTimeout(() => {
+                window.location.href = "/dashboard/volunteer/deliveries/";
+            }, 1500);
+        } else {
+            if (deliverBtn) {
+                deliverBtn.disabled = false;
+                deliverBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14"/>
+                    <path d="m12 5 7 7-7 7"/>
+                </svg> Deliver to Camp`;
+            }
+            showToast(data.message || 'Failed to deliver', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('[v0] Error delivering to camp:', error);
+        if (deliverBtn) {
+            deliverBtn.disabled = false;
+            deliverBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14"/>
+                <path d="m12 5 7 7-7 7"/>
+            </svg> Deliver to Camp`;
+        }
+        showToast('An error occurred. Please try again.', 'error');
+    });
 }
 
 // ============ CLEANUP ============
