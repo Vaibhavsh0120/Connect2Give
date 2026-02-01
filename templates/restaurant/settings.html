@@ -340,4 +340,55 @@ document.addEventListener('click', function(e) {
     if (e.target === setPasswordModal) closeSetPasswordModal();
 });
 </script>
+
+<div class="settings-card" style="border: 2px solid #fee2e2; background: #fef2f2;">
+    <h3 style="color: #dc2626;">Danger Zone</h3>
+    <p>Irreversible and destructive actions</p>
+    
+    <div class="settings-row" style="border-color: #fecaca;">
+        <div class="settings-info">
+            <strong style="color: #dc2626;">Delete Account</strong>
+            <small>Permanently delete your account and all associated data. This cannot be undone.</small>
+        </div>
+        <div class="settings-action">
+            <button class="btn-action danger" onclick="confirmDeleteAccount()">Delete Account</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDeleteAccount() {
+    const confirmed = confirm('Are you sure you want to delete your account? This action cannot be undone. All your data will be permanently deleted.');
+    if (!confirmed) return;
+    
+    const doubleConfirmed = confirm('This is your last chance. Click OK to permanently delete your account.');
+    if (!doubleConfirmed) return;
+    
+    const csrftoken = getCookie('csrftoken');
+    
+    fetch('{% url "delete_account" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Account deleted successfully', 'success');
+            setTimeout(() => {
+                window.location.href = '{% url "index" %}';
+            }, 1500);
+        } else {
+            showToast(data.message || 'Failed to delete account', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('[v0] Error:', error);
+        showToast('An error occurred', 'error');
+    });
+}
+</script>
+
 {% endblock restaurant_content %}

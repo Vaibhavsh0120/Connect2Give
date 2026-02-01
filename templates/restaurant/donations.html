@@ -83,6 +83,7 @@
 
 {% block scripts %}
 {{ block.super }}
+<script src="{% static 'js/common.js' %}"></script>
 <script>
     // Tab switching functionality
     function switchTab(event, tabId) {
@@ -91,6 +92,17 @@
         document.getElementById(tabId).classList.add('active');
         event.currentTarget.classList.add('active');
     }
+    
+    // Show success toast on page load if messages exist
+    document.addEventListener('DOMContentLoaded', function() {
+        const messages = document.querySelectorAll('.success-message');
+        if (messages.length > 0) {
+            messages.forEach(msg => {
+                showToast(msg.textContent, 'success');
+                msg.style.display = 'none';
+            });
+        }
+    });
 
     // Function to use the default address
     function useDefaultAddress() {

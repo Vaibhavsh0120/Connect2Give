@@ -365,30 +365,29 @@ function confirmDeleteAccount() {
     
     const csrftoken = getCookie('csrftoken');
     
-    // TODO: Implement delete account endpoint
-    showToast('Account deletion endpoint not yet implemented', 'error');
-    // fetch('/account/delete/', {
-    //     method: 'POST',
-    //     headers: {
-    //         'X-CSRFToken': csrftoken,
-    //         'Content-Type': 'application/json'
-    //     }
-    // })
-    // .then(response => response.json())
-    // .then(data => {
-    //     if (data.success) {
-    //         showToast('Account deleted successfully', 'success');
-    //         setTimeout(() => {
-    //             window.location.href = '{% url "index" %}';
-    //         }, 1500);
-    //     } else {
-    //         showToast(data.message || 'Failed to delete account', 'error');
-    //     }
-    // })
-    // .catch(error => {
-    //     console.error('[v0] Error:', error);
-    //     showToast('An error occurred', 'error');
-    // });
+    fetch('{% url "delete_account" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Account deleted successfully', 'success');
+            setTimeout(() => {
+                window.location.href = '{% url "index" %}';
+            }, 1500);
+        } else {
+            showToast(data.message || 'Failed to delete account', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('[v0] Error:', error);
+        showToast('An error occurred', 'error');
+    });
 }
 </script>
+
 {% endblock %}

@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     if (pickupCards.length > 0) {
         console.log('[v0] Active pickups found:', pickupCards.length);
-        // Auto-trigger route calculation after a short delay to ensure DOM is ready
+        // Auto-trigger route calculation after ensuring DOM is fully ready
         setTimeout(() => {
             // Fetch the route from backend
             fetch('/api/calculate-pickup-route/', {
@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .catch(error => {
                 console.error('[v0] Error auto-initializing route:', error);
             });
-        }, 500);
+        }, 800);
     }
     
     // Check if all pickups are already collected (on page load)
@@ -131,8 +131,35 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         }
-    }, 1000);
+    }, 1200);
+    
+    // Setup delegated event handlers for dynamically added buttons
+    setupDelegatedEventHandlers();
 });
+
+// ============ DELEGATED EVENT HANDLERS ============
+
+/**
+ * Setup delegated event handlers for dynamically added elements
+ * This ensures Cancel buttons work even when added after page load
+ */
+function setupDelegatedEventHandlers() {
+    // Delegated event handler for Cancel buttons
+    document.addEventListener('click', function(event) {
+        if (event.target.classList.contains('btn-cancel')) {
+            event.preventDefault();
+            event.stopPropagation();
+            // Find the donation ID from the button's ID
+            const match = event.target.id.match(/cancel-btn-(\d+)/);
+            if (match) {
+                const donationId = parseInt(match[1]);
+                cancelPickup(donationId);
+            }
+        }
+    });
+    
+    console.log('[v0] Delegated event handlers initialized');
+}
 
 // ============ PICKUP MAP (Mode A - Multi-stop TSP) ============
 
@@ -240,10 +267,13 @@ function displayPickupRoute(data) {
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickupMapInstance);
     
-    // Ensure map renders correctly after container becomes visible
+    // Critical: Force map to recalculate size after initialization
+    // This resolves issues where the container had wrong dimensions during map init
     setTimeout(() => {
-        pickupMapInstance.invalidateSize();
-    }, 100);
+        if (pickupMapInstance) {
+            pickupMapInstance.invalidateSize(true); // true = animate, smooth resizing
+        }
+    }, 200);
     
     // Create waypoints from route data
     const waypoints = data.route.map(loc => L.latLng(loc.lat, loc.lon));
@@ -825,6 +855,17 @@ function unregisterFromNGO(ngoId) {
         }
         showToast('An error occurred. Please try again.', 'error');
     });
+}
+
+// ============ DELIVERY NAVIGATION ============
+
+/**
+ * Redirect to deliveries page once all pickups are collected
+ */
+function proceedToDelivery() {
+    console.log('[v0] Proceeding to delivery page...');
+    // Navigate to the deliveries page
+    window.location.href = '/dashboard/volunteer/deliveries/';
 }
 
 // ============ CLEANUP ============

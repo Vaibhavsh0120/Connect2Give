@@ -225,29 +225,7 @@ def volunteer_manage_pickups(request):
         return redirect('volunteer_pickups')
 
 
-@login_required(login_url='login_page')
-@user_type_required('VOLUNTEER')
-def volunteer_manage_camps(request):
-    volunteer_profile = request.user.volunteer_profile
-    registered_ngos = volunteer_profile.registered_ngos.all()
-    
-    # Get search query
-    search_query = request.GET.get('q', '').strip()
-    available_ngos = NGOProfile.objects.exclude(pk__in=[n.pk for n in registered_ngos])
-    
-    # Apply search filter
-    if search_query:
-        from django.db.models import Q
-        available_ngos = available_ngos.filter(
-            Q(ngo_name__icontains=search_query) | 
-            Q(address__icontains=search_query)
-        )
-    
-    context = {
-        'registered_ngos': registered_ngos,
-        'available_ngos': available_ngos,
-    }
-    return render(request, 'volunteer/manage_camps.html', context)
+
 
 @login_required(login_url='login_page')
 @user_type_required('VOLUNTEER')
