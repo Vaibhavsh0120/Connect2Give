@@ -244,6 +244,32 @@
 </div>
 
 <script>
+// Helper function to get CSRF token (if not available from common.js)
+window.getCookie = window.getCookie || function(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+};
+
+// Helper function to show toast messages (if not available from common.js)
+window.showToast = window.showToast || function(message, type = 'info') {
+    console.log('[v0] Toast:', type, message);
+    if (type === 'error') {
+        alert('Error: ' + message);
+    } else if (type === 'success') {
+        console.log('[v0] Success:', message);
+    }
+};
+
 function openPasswordChangeModal() {
     document.getElementById('password-change-modal').style.display = 'flex';
 }

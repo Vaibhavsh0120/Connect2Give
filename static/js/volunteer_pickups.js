@@ -80,6 +80,18 @@ function createRestaurantIcon(number) {
 document.addEventListener('DOMContentLoaded', function () {
     // Start live location tracking
     startLiveLocationTracking();
+    
+    // Auto-calculate and display route if there are active pickups
+    const pickupList = document.getElementById('pickup-list');
+    const pickupCards = pickupList ? pickupList.querySelectorAll('[data-donation-id]') : [];
+    
+    if (pickupCards.length > 0) {
+        console.log('[v0] Active pickups found:', pickupCards.length);
+        // Auto-trigger route calculation after a short delay to ensure DOM is ready
+        setTimeout(() => {
+            calculateOptimizedRoute();
+        }, 500);
+    }
 });
 
 // ============ PICKUP MAP (Mode A - Multi-stop TSP) ============
@@ -413,11 +425,14 @@ function acceptDonation(donationId) {
 
 /**
  * Mark a donation as collected via AJAX
+ * FIXED: Updates DOM immediately, checks if all collected, shows delivery button
  * @param {number} donationId - ID of the donation to mark as collected
  */
 function markAsCollected(donationId) {
     const csrftoken = getCookie('csrftoken');
     const collectBtn = document.getElementById(`collect-btn-${donationId}`);
+    const pickupCard = document.getElementById(`pickup-card-${donationId}`);
+    const cancelBtn = document.getElementById(`cancel-btn-${donationId}`);
 
     if (!collectBtn) return;
 
@@ -435,7 +450,49 @@ function markAsCollected(donationId) {
     .then(data => {
         if (data.success) {
             showToast(data.message || 'Marked as collected!', 'success');
-            setTimeout(() => location.reload(), 1000);
+            
+            // FIXED: Update button to show "Collected" status
+            collectBtn.textContent = 'Collected ✓';
+            collectBtn.style.backgroundColor = '#10b981';
+            collectBtn.style.cursor = 'default';
+            collectBtn.disabled = true;
+            
+            // Disable cancel button for collected items
+            if (cancelBtn) {
+                cancelBtn.disabled = true;
+                cancelBtn.style.opacity = '0.5';
+            }
+            
+            // Update collected count
+            const collectedCountEl = document.getElementById('collected-count');
+            if (collectedCountEl) {
+                const currentCount = parseInt(collectedCountEl.textContent) || 0;
+                collectedCountEl.textContent = currentCount + 1;
+            }
+            
+            // FIXED: Check if ALL pickups are collected
+            setTimeout(() => {
+                const allPickups = document.querySelectorAll('#pickup-list [data-donation-id]');
+                const allCollected = Array.from(allPickups).every(card => {
+                    const btn = card.querySelector('[id^="collect-btn-"]');
+                    return btn && btn.textContent.includes('✓');
+                });
+                
+                console.log('[v0] All collected?', allCollected, '- Total pickups:', allPickups.length);
+                
+                if (allCollected && allPickups.length > 0) {
+                    // Hide map and show delivery button
+                    const mapContainer = document.getElementById('pickup-map-container');
+                    const infoBanner = document.getElementById('route-info-banner');
+                    const deliveryBtn = document.getElementById('delivery-button-container');
+                    
+                    if (mapContainer) mapContainer.style.display = 'none';
+                    if (infoBanner) infoBanner.style.display = 'none';
+                    if (deliveryBtn) deliveryBtn.style.display = 'block';
+                    
+                    console.log('[v0] All items collected - showing delivery button');
+                }
+            }, 300);
         } else {
             collectBtn.disabled = false;
             collectBtn.textContent = 'Mark as Collected';
@@ -452,6 +509,7 @@ function markAsCollected(donationId) {
 
 /**
  * Cancel a pickup (reset donation to PENDING)
+ * FIXED: Immediately removes item from DOM and refreshes map without full page reload
  * @param {number} donationId - ID of the donation to cancel
  */
 function cancelPickup(donationId) {
@@ -460,6 +518,7 @@ function cancelPickup(donationId) {
     }
     
     const csrftoken = getCookie('csrftoken');
+    const pickupCard = document.getElementById(`pickup-card-${donationId}`);
     const cancelBtn = document.getElementById(`cancel-btn-${donationId}`);
     
     if (cancelBtn) {
@@ -478,7 +537,46 @@ function cancelPickup(donationId) {
     .then(data => {
         if (data.success) {
             showToast(data.message || 'Pickup cancelled successfully', 'success');
-            setTimeout(() => location.reload(), 1000);
+            
+            // FIXED: Immediately remove the card from DOM with animation
+            if (pickupCard) {
+                pickupCard.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+                pickupCard.style.opacity = '0';
+                pickupCard.style.transform = 'translateX(-20px)';
+                setTimeout(() => {
+                    pickupCard.remove();
+                    console.log('[v0] Pickup card removed from DOM');
+                    
+                    // FIXED: Update collected count if applicable
+                    const collectedCountEl = document.getElementById('collected-count');
+                    if (collectedCountEl) {
+                        const currentCount = parseInt(collectedCountEl.textContent) || 0;
+                        collectedCountEl.textContent = currentCount;
+                    }
+                    
+                    // FIXED: Refresh the map with new route (without all pickups)
+                    const remainingPickups = document.querySelectorAll('#pickup-list [data-donation-id]');
+                    console.log('[v0] Remaining pickups:', remainingPickups.length);
+                    
+                    if (remainingPickups.length > 0) {
+                        // Recalculate route without the cancelled item
+                        setTimeout(() => {
+                            calculateOptimizedRoute();
+                        }, 300);
+                    } else {
+                        // No more pickups - hide map and delivery button
+                        const mapContainer = document.getElementById('pickup-map-container');
+                        const infoBanner = document.getElementById('route-info-banner');
+                        const deliveryBtn = document.getElementById('delivery-button-container');
+                        
+                        if (mapContainer) mapContainer.style.display = 'none';
+                        if (infoBanner) infoBanner.style.display = 'none';
+                        if (deliveryBtn) deliveryBtn.style.display = 'none';
+                        
+                        console.log('[v0] No more pickups - hiding map');
+                    }
+                }, 300);
+            }
         } else {
             if (cancelBtn) {
                 cancelBtn.disabled = false;

@@ -280,33 +280,9 @@
 {# Active Pickups Section #}
 {% if active_donations %}
 <div class="content-card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 12px;">
-        <h3 style="margin: 0;">My Active Pickups</h3>
-        <button class="btn-primary-action" onclick="calculateOptimizedRoute()" id="calculate-route-btn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                <circle cx="12" cy="10" r="3"/>
-            </svg>
-            Calculate Best Route
-        </button>
-    </div>
+    <h3 style="margin: 0 0 1rem 0;">My Active Pickups</h3>
 
-    {# Route Map (hidden until calculated) #}
-    <div class="pickup-map-container" id="pickup-map-container" style="display: none;">
-        <div id="pickup-route-map"></div>
-        <div class="map-legend">
-            <div class="map-legend-item">
-                <div class="legend-marker" style="background: #10b981;"></div>
-                <span>Your Location</span>
-            </div>
-            <div class="map-legend-item">
-                <div class="legend-marker" style="background: #3b82f6;"></div>
-                <span>Restaurant Pickup</span>
-            </div>
-        </div>
-    </div>
-
-    {# Route Info Banner (hidden until calculated) #}
+    {# Route Info Banner (shown when map is active) #}
     <div class="route-info-banner" id="route-info-banner" style="display: none;">
         <div class="route-details">
             <div class="route-detail">
@@ -320,6 +296,21 @@
             <div class="route-detail">
                 <div class="route-detail-value" id="route-stops">{{ active_donations.count }}</div>
                 <div class="route-detail-label">Stops</div>
+            </div>
+        </div>
+    </div>
+
+    {# Route Map (shown immediately when there are pickups) #}
+    <div class="pickup-map-container" id="pickup-map-container" style="display: none;">
+        <div id="pickup-route-map"></div>
+        <div class="map-legend">
+            <div class="map-legend-item">
+                <div class="legend-marker" style="background: #10b981;"></div>
+                <span>Your Location</span>
+            </div>
+            <div class="map-legend-item">
+                <div class="legend-marker" style="background: #3b82f6;"></div>
+                <span>Restaurant Pickup</span>
             </div>
         </div>
     </div>
@@ -348,9 +339,8 @@
         {% endfor %}
     </div>
 
-    {# Proceed to Delivery Button #}
-    {% if collected_count > 0 %}
-    <div style="margin-top: 1.5rem; text-align: center;">
+    {# Proceed to Delivery Button - Only show if all active are COLLECTED #}
+    <div id="delivery-button-container" style="display: none; margin-top: 1.5rem; text-align: center;">
         <a href="{% url 'volunteer_deliveries' %}" class="btn-primary-action">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M5 12h14"/>
@@ -359,7 +349,18 @@
             Proceed to Delivery
         </a>
     </div>
-    {% endif %}
+</div>
+{% else %}
+{# No active pickups #}
+<div class="content-card">
+    <div style="text-align: center; padding: 2rem;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 1rem; opacity: 0.5; margin-left: auto; margin-right: auto;">
+            <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
+            <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z"/>
+        </svg>
+        <h4 style="margin: 0 0 0.5rem 0; color: #6b7280;">No Active Pickups</h4>
+        <p style="margin: 0; color: #9ca3af;">Accept donations below to start collecting.</p>
+    </div>
 </div>
 {% endif %}
 
