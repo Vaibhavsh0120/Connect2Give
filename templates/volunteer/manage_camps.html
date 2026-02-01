@@ -140,6 +140,10 @@
     }
     
     function leaveNGO(ngoId) {
+        if (!confirm('Are you sure you want to leave this NGO?')) {
+            return;
+        }
+        
         const csrftoken = getCookie('csrftoken');
         
         fetch(`/unregister_from_ngo/${ngoId}/`, {
@@ -152,31 +156,55 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Remove from registered NGOs table
+                // NO RELOAD: Remove from registered NGOs table
                 const registeredRow = document.getElementById(`registered-ngo-${ngoId}`);
                 if (registeredRow) {
-                    registeredRow.remove();
+                    registeredRow.style.transition = 'opacity 0.3s ease-out';
+                    registeredRow.style.opacity = '0';
+                    setTimeout(() => {
+                        registeredRow.remove();
+                        
+                        // Check if table is now empty
+                        const registeredTbody = document.getElementById('registered-ngos-tbody');
+                        if (registeredTbody.children.length === 0) {
+                            const emptyRow = document.createElement('tr');
+                            emptyRow.id = 'registered-empty';
+                            emptyRow.innerHTML = '<td colspan="3"><div class="empty-state"><div class="empty-state-icon" style="font-size: 3rem; margin-bottom: 1rem;">📋</div><p style="font-size: 1.125rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.5rem;">Not Registered with Any NGOs</p></div></td>';
+                            registeredTbody.appendChild(emptyRow);
+                        }
+                    }, 300);
                 }
                 
-                // Check if table is now empty
-                const registeredTbody = document.getElementById('registered-ngos-tbody');
-                if (registeredTbody.children.length === 0) {
-                    const emptyRow = document.createElement('tr');
-                    emptyRow.id = 'registered-empty';
-                    emptyRow.innerHTML = '<td colspan="3" class="empty-state">You are not registered with any NGOs yet.</td>';
-                    registeredTbody.appendChild(emptyRow);
+                // Add NGO back to available list
+                if (data.ngo_name) {
+                    const availableTbody = document.getElementById('available-ngos-tbody');
+                    if (availableTbody) {
+                        // Remove empty state if exists
+                        const emptyStateRow = availableTbody.querySelector('tr:has(.empty-state)');
+                        if (emptyStateRow) {
+                            emptyStateRow.remove();
+                        }
+                        
+                        const newRow = document.createElement('tr');
+                        newRow.id = `available-ngo-${ngoId}`;
+                        newRow.innerHTML = `
+                            <td data-label="NGO Name"><strong>${data.ngo_name}</strong></td>
+                            <td data-label="Address">${data.address || ''}</td>
+                            <td data-label="Action">
+                                <button type="button" class="action-button" onclick="joinNGO(${ngoId}, '${data.ngo_name.replace(/'/g, "\\'")}', '${(data.address || '').replace(/'/g, "\\'")}'  )">Join</button>
+                            </td>
+                        `;
+                        availableTbody.appendChild(newRow);
+                    }
                 }
                 
-                showToast(data.message || 'Successfully unregistered from NGO', 'success');
-                
-                // Reload page to show the NGO in available list
-                setTimeout(() => location.reload(), 1000);
+                showToast(data.message || 'Successfully left NGO', 'success');
             } else {
                 showToast(data.message || 'Failed to leave NGO', 'error');
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('[v0] Error:', error);
             showToast('An error occurred. Please try again.', 'error');
         });
     }

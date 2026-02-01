@@ -245,6 +245,32 @@
 </div>
 
 <script>
+// Helper function to get CSRF token (if not available from common.js)
+window.getCookie = window.getCookie || function(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+};
+
+// Helper function to show toast messages (if not available from common.js)
+window.showToast = window.showToast || function(message, type = 'info') {
+    console.log('[v0] Toast:', type, message);
+    if (type === 'error') {
+        alert('Error: ' + message);
+    } else if (type === 'success') {
+        console.log('[v0] Success:', message);
+    }
+};
+
 function openPasswordChangeModal() {
     document.getElementById('password-change-modal').style.display = 'flex';
 }
@@ -275,7 +301,25 @@ function confirmUnlinkGoogle() {
         .then(data => {
             if (data.success) {
                 showToast('Google account unlinked successfully', 'success');
-                setTimeout(() => location.reload(), 1500);
+                
+                // NO RELOAD: Update UI to show password-only mode
+                setTimeout(() => {
+                    const settingsCard = document.querySelector('.settings-card');
+                    if (settingsCard) {
+                        fetch(window.location.href)
+                            .then(r => r.text())
+                            .then(html => {
+                                const parser = new DOMParser();
+                                const newDoc = parser.parseFromString(html, 'text/html');
+                                const newCard = newDoc.querySelector('.settings-card');
+                                if (newCard && settingsCard) {
+                                    settingsCard.innerHTML = newCard.innerHTML;
+                                    console.log('[v0] Settings card updated without reload');
+                                }
+                            })
+                            .catch(e => console.error('[v0] Error reloading settings:', e));
+                    }
+                }, 300);
             } else {
                 showToast(data.message || 'Failed to unlink Google account', 'error');
             }
