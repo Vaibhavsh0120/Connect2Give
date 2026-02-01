@@ -295,13 +295,7 @@ function displayPickupRoute(data) {
         pickupMapInstance.invalidateSize(true);
     }, 500);
     
-    // Create waypoints from route data
-    const waypoints = data.route.map(loc => L.latLng(loc.lat, loc.lon));
-    
-    // --- TEMPORARILY DISABLED ROUTING PATH (User Request) ---
-    // Instead, we just add markers and fit bounds manually so map shows
-    
-    // 1. Add Markers manually
+    // 1. Add Custom Markers manually (for better UI)
     data.route.forEach((loc, index) => {
         if (index === 0) {
             // Volunteer marker
@@ -317,13 +311,32 @@ function displayPickupRoute(data) {
         }
     });
 
-    // 2. Fit Bounds so map is centered correctly
-    if (waypoints.length > 0) {
-        const bounds = L.latLngBounds(waypoints);
+    // 2. Add Routing Path (Using Leaflet Routing Machine if available)
+    if (typeof L.Routing !== 'undefined') {
+        const waypoints = data.route.map(loc => L.latLng(loc.lat, loc.lon));
+        
+        pickupRoutingControl = L.Routing.control({
+            waypoints: waypoints,
+            router: L.Routing.osrmv1({
+                serviceUrl: 'https://router.project-osrm.org/route/v1' // Standard demo server
+            }),
+            lineOptions: {
+                styles: [{color: '#3b82f6', opacity: 0.8, weight: 6}]
+            },
+            createMarker: function() { return null; }, // Suppress default markers, we use custom ones above
+            addWaypoints: false,
+            draggableWaypoints: false,
+            fitSelectedRoutes: true,
+            show: false // Hide the itinerary text container
+        }).addTo(pickupMapInstance);
+        
+        console.log('[v0] Routing control added for path visualization');
+    } else {
+        // Fallback: Just fit bounds if routing library is missing
+        console.warn('[v0] Leaflet Routing Machine not loaded. Showing straight lines/bounds only.');
+        const bounds = L.latLngBounds(data.route.map(loc => L.latLng(loc.lat, loc.lon)));
         pickupMapInstance.fitBounds(bounds, { padding: [50, 50] });
     }
-    
-    // --- END OF MANUAL MAP SETUP ---
     
     // Show live tracking indicator
     const trackingStatus = document.getElementById('live-tracking-status');
@@ -610,6 +623,7 @@ function markAsCollected(donationId) {
             }
             
             // Re-evaluate map visibility logic after marking as collected
+            // This will re-trigger route calculation if uncollected items remain
             setTimeout(() => {
                 initializePickupMode();
             }, 300);
@@ -702,6 +716,7 @@ function cancelPickup(donationId) {
                     }
                     
                     // Re-evaluate map visibility logic
+                    // This will refresh the route to exclude the cancelled item
                     setTimeout(() => {
                         initializePickupMode();
                     }, 300);

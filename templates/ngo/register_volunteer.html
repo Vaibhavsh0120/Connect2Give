@@ -38,6 +38,8 @@
                             placeholder="John Doe"
                             value="{{ form.full_name.value|default:'' }}"
                             required
+                            pattern="[A-Za-z\s]+"
+                            oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')"
                         >
                         {% if form.full_name.errors %}
                             <p class="field-error">{{ form.full_name.errors.0 }}</p>
@@ -94,13 +96,17 @@
                             type="tel" 
                             name="phone_number" 
                             id="id_phone_number" 
-                            placeholder="+91 98765 43210"
+                            placeholder="9876543210"
                             value="{{ form.phone_number.value|default:'' }}"
                             required
+                            pattern="[0-9]{10}"
+                            maxlength="10"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);"
                         >
                         {% if form.phone_number.errors %}
                             <p class="field-error">{{ form.phone_number.errors.0 }}</p>
                         {% endif %}
+                        <p class="form-help-text">10 digits only</p>
                     </div>
 
                     <div class="form-group">
