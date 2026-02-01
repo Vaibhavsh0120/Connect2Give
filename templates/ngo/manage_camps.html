@@ -7,11 +7,6 @@
 
 {% block ngo_content %}
     <div class="camps-container">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="success-message">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
 
         <div class="tab-navigation">
             <button class="tab-button {% if not active_tab %}active{% endif %}" onclick="switchTab(event, 'create-camp')">Create Camp</button>

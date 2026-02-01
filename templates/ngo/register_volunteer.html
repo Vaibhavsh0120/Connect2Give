@@ -10,7 +10,6 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
 <div class="register-volunteer-page">
-    <!-- Back navigation link -->
     <a href="{% url 'ngo_manage_volunteers' %}" class="back-link">
         <svg class="back-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
@@ -18,18 +17,15 @@
         <span>Back to Volunteers List</span>
     </a>
 
-    <!-- Volunteer registration form card -->
     <div class="content-card volunteer-form-card">
         <h3>Volunteer Details</h3>
         <form action="{% url 'ngo_register_volunteer' %}" method="POST" enctype="multipart/form-data" class="volunteer-form">
             {% csrf_token %}
             
-            <!-- Hidden fields for location -->
             <input type="hidden" name="latitude" id="id_volunteer_latitude">
             <input type="hidden" name="longitude" id="id_volunteer_longitude">
             
             <div class="form-row">
-                <!-- Left Column: Basic Info -->
                 <div class="form-column">
                     <div class="form-group">
                         <label for="id_full_name">
@@ -127,7 +123,6 @@
                     </div>
                 </div>
                 
-                <!-- Right Column: Profile Picture & Skills -->
                 <div class="form-column">
                     <div class="form-group">
                         <label>Profile Picture (Optional)</label>
@@ -179,7 +174,6 @@
                 </div>
             </div>
 
-            <!-- Address Section with Map -->
             <div class="form-group address-section">
                 <label for="id_volunteer_address">Primary Address</label>
                 <div class="address-input-group">
@@ -206,6 +200,23 @@
             <p>
                 <strong>Note:</strong> An invitation email with temporary credentials will be sent to the volunteer. They must change their password on first login.
             </p>
+        </div>
+    </div>
+</div>
+
+<div id="errorPopupModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+        <div class="modal-header error-header">
+            <div class="icon-circle">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </div>
+            <h3>Error Occurred</h3>
+        </div>
+        <div class="modal-body">
+            <p id="errorPopupMessage">Something went wrong.</p>
+        </div>
+        <div class="modal-footer">
+            <button onclick="closeErrorPopup()" class="btn-close-modal">Understood</button>
         </div>
     </div>
 </div>
@@ -442,6 +453,91 @@
         font-size: 0.875rem;
         color: var(--text-secondary);
     }
+    
+    /* Modal Styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        backdrop-filter: blur(2px);
+    }
+
+    .modal-card {
+        background: white;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        overflow: hidden;
+        animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes modalPop {
+        0% { transform: scale(0.9); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header.error-header {
+        background-color: #fef2f2;
+        padding: 1.5rem;
+        text-align: center;
+        border-bottom: 1px solid #fee2e2;
+    }
+
+    .icon-circle {
+        width: 48px;
+        height: 48px;
+        background-color: #fee2e2;
+        color: #ef4444;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+    }
+
+    .modal-header h3 {
+        color: #991b1b;
+        margin: 0;
+        font-size: 1.25rem;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+        text-align: center;
+        color: #4b5563;
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    .modal-footer {
+        padding: 1rem 1.5rem 1.5rem;
+        display: flex;
+        justify-content: center;
+    }
+
+    .btn-close-modal {
+        background-color: #ef4444;
+        color: white;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        width: 100%;
+    }
+
+    .btn-close-modal:hover {
+        background-color: #dc2626;
+    }
 
     /* Mobile Responsive */
     @media (max-width: 768px) {
@@ -568,5 +664,25 @@ function checkUsernameAvailability() {
             statusEl.className = 'form-help-text unavailable';
         });
 }
+
+// Modal Logic
+function closeErrorPopup() {
+    document.getElementById('errorPopupModal').style.display = 'none';
+}
+
+// Check if Django passed an error_popup variable
+{% if error_popup %}
+    document.addEventListener('DOMContentLoaded', function() {
+        // Use a small timeout to ensure it pops up after other init
+        setTimeout(function() {
+            const message = "{{ error_popup|escapejs }}";
+            const msgElement = document.getElementById('errorPopupMessage');
+            if(msgElement) {
+                msgElement.textContent = message;
+                document.getElementById('errorPopupModal').style.display = 'flex';
+            }
+        }, 100);
+    });
+{% endif %}
 </script>
 {% endblock %}

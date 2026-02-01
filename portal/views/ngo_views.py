@@ -7,8 +7,10 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
+from django.db import transaction
 import secrets
 import string
+import socket  # Imported to help catch network errors
 from ..models import DonationCamp, Donation, NGOProfile, VolunteerProfile, User, NGOVolunteer
 from ..forms import DonationCampForm, NGOProfileForm, NGORegisterVolunteerForm
 from ..decorators import user_type_required
@@ -121,87 +123,102 @@ def ngo_settings(request):
 @login_required(login_url='login_page')
 @user_type_required('NGO')
 def ngo_register_volunteer(request):
-    """NGO portal to register new volunteers with comprehensive details"""
+    """NGO portal to register new volunteers with atomic rollback and human-readable errors"""
     ngo_profile = request.user.ngo_profile
+    error_popup = None
     
     if request.method == 'POST':
         form = NGORegisterVolunteerForm(request.POST, request.FILES)
         if form.is_valid():
-            # Generate temporary password
-            temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
-            
-            # Use the explicitly provided username (validated in form)
-            username = form.cleaned_data['username']
-            
-            # Create user
             try:
-                user = User.objects.create_user(
-                    username=username,
-                    email=form.cleaned_data['email'],
-                    password=temp_password,
-                    user_type=User.UserType.VOLUNTEER,
-                    first_name=form.cleaned_data['full_name'].split(' ')[0],
-                    last_name=' '.join(form.cleaned_data['full_name'].split(' ')[1:]),
-                    must_change_password=True  # Force password change
-                )
+                # TRANSACTION BLOCK: All or Nothing
+                with transaction.atomic():
+                    # 1. Generate Creds
+                    temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+                    username = form.cleaned_data['username']
+                    
+                    # 2. Create User
+                    user = User.objects.create_user(
+                        username=username,
+                        email=form.cleaned_data['email'],
+                        password=temp_password,
+                        user_type=User.UserType.VOLUNTEER,
+                        first_name=form.cleaned_data['full_name'].split(' ')[0],
+                        last_name=' '.join(form.cleaned_data['full_name'].split(' ')[1:]),
+                        must_change_password=True
+                    )
+                    
+                    # 3. Create Profile
+                    volunteer_profile = VolunteerProfile.objects.create(
+                        user=user,
+                        full_name=form.cleaned_data['full_name'],
+                        email=form.cleaned_data['email'],
+                        phone_number=form.cleaned_data['phone_number'],
+                        aadhar_number=form.cleaned_data['aadhar_number'],
+                        skills=form.cleaned_data.get('skills', ''),
+                        address=form.cleaned_data.get('address', ''),
+                        latitude=form.cleaned_data.get('latitude'),
+                        longitude=form.cleaned_data.get('longitude'),
+                        registered_ngo=ngo_profile
+                    )
+                    
+                    # 4. Handle Image
+                    if form.cleaned_data.get('profile_picture'):
+                        volunteer_profile.profile_picture = form.cleaned_data['profile_picture']
+                        volunteer_profile.save()
+                    
+                    # 5. Link to NGO
+                    NGOVolunteer.objects.create(ngo=ngo_profile, volunteer=volunteer_profile)
+                    
+                    # 6. Send Email
+                    subject = f'Welcome to Connect2Give - Your Account Details'
+                    context = {
+                        'volunteer_name': form.cleaned_data['full_name'],
+                        'username': username,
+                        'temp_password': temp_password,
+                        'ngo_name': ngo_profile.ngo_name,
+                        'login_url': request.build_absolute_uri('/login/'),
+                    }
+                    html_message = render_to_string('emails/volunteer_invitation.html', context)
+                    plain_message = strip_tags(html_message)
+                    
+                    send_mail(
+                        subject,
+                        plain_message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [form.cleaned_data['email']],
+                        html_message=html_message,
+                        fail_silently=False, 
+                    )
                 
-                # Create volunteer profile with all fields
-                volunteer_profile = VolunteerProfile.objects.create(
-                    user=user,
-                    full_name=form.cleaned_data['full_name'],
-                    email=form.cleaned_data['email'],
-                    phone_number=form.cleaned_data['phone_number'],
-                    aadhar_number=form.cleaned_data['aadhar_number'],
-                    skills=form.cleaned_data.get('skills', ''),
-                    address=form.cleaned_data.get('address', ''),
-                    latitude=form.cleaned_data.get('latitude'),
-                    longitude=form.cleaned_data.get('longitude'),
-                    registered_ngo=ngo_profile
-                )
-                
-                # Handle profile picture upload
-                if form.cleaned_data.get('profile_picture'):
-                    volunteer_profile.profile_picture = form.cleaned_data['profile_picture']
-                    volunteer_profile.save()
-                
-                # Add to NGO's volunteers
-                NGOVolunteer.objects.create(ngo=ngo_profile, volunteer=volunteer_profile)
-                
-                # Send email with credentials
-                subject = f'Welcome to Connect2Give - Your Account Details'
-                context = {
-                    'volunteer_name': form.cleaned_data['full_name'],
-                    'username': username,
-                    'temp_password': temp_password,
-                    'ngo_name': ngo_profile.ngo_name,
-                    'login_url': request.build_absolute_uri('/login/'),
-                }
-                html_message = render_to_string('emails/volunteer_invitation.html', context)
-                plain_message = strip_tags(html_message)
-                
-                send_mail(
-                    subject,
-                    plain_message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [form.cleaned_data['email']],
-                    html_message=html_message,
-                    fail_silently=False,
-                )
-                
+                # Success
                 messages.success(request, f'Volunteer {form.cleaned_data["full_name"]} registered successfully! Invitation email sent.')
-                form = NGORegisterVolunteerForm()  # Reset form
+                return redirect('ngo_register_volunteer')
                 
             except Exception as e:
-                messages.error(request, f'Error registering volunteer: {str(e)}')
+                # DB has rolled back automatically. Now assume friendly error.
+                error_str = str(e)
+                
+                # Human Readable Mappings
+                if "Connection refused" in error_str or "111" in error_str or "61" in error_str:
+                    error_popup = "Connection Failed: Could not connect to the email server. Please check your internet connection or email settings."
+                elif "AuthenticationError" in error_str or "535" in error_str:
+                    error_popup = "Email Login Failed: The system could not log in to the email account. Check the 'EMAIL_HOST_PASSWORD' in your settings."
+                elif "gaierror" in error_str or "Temporary failure" in error_str:
+                    error_popup = "DNS Error: Could not find the email server. Please check your internet connection."
+                else:
+                    # Fallback for other errors
+                    error_popup = f"Registration Failed: {error_str}"
     else:
         form = NGORegisterVolunteerForm()
     
-    # Get registered volunteers for this NGO
+    # Get registered volunteers
     registered_volunteers = VolunteerProfile.objects.filter(registered_ngo=ngo_profile).select_related('user').order_by('-created_at')
     
     context = {
         'form': form,
         'registered_volunteers': registered_volunteers,
+        'error_popup': error_popup,
     }
     return render(request, 'ngo/register_volunteer.html', context)
 
