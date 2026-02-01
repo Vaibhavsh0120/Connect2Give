@@ -278,6 +278,10 @@ def unlink_google_account(request):
         # Try to remove Google social auth entry
         try:
             from allauth.socialaccount.models import SocialAccount
+        except ImportError:
+             return JsonResponse({'success': False, 'message': 'Social auth configuration error'}, status=500)
+
+        try:
             social_auth = SocialAccount.objects.get(user=user, provider='google')
             social_auth.delete()
             return JsonResponse({'success': True, 'message': 'Google account unlinked'})

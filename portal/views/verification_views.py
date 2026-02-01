@@ -96,7 +96,7 @@ def verify_and_approve_donation(request, donation_id):
             return JsonResponse({
                 'success': True,
                 'message': f'Donation from {donation.restaurant.restaurant_name} verified and approved',
-                'donation_id': donation.id
+                'donation_id': donation.pk
             })
     
     except Exception as e:
@@ -149,7 +149,7 @@ def reject_donation_verification(request, donation_id):
             return JsonResponse({
                 'success': True,
                 'message': f'Donation rejected. Volunteer can collect and re-deliver.',
-                'donation_id': donation.id
+                'donation_id': donation.pk
             })
     
     except Exception as e:
