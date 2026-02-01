@@ -336,7 +336,19 @@ def cancel_pickup(request, donation_id):
         donation.collected_at = None
         donation.save()
         
-        return JsonResponse({'success': True, 'message': 'Pickup cancelled. The donation is now available for other volunteers.'})
+        # Return donation details so frontend can add it back to available list
+        return JsonResponse({
+            'success': True, 
+            'message': 'Pickup cancelled. The donation is now available for other volunteers.',
+            'donation': {
+                'pk': donation.pk,
+                'restaurant_name': donation.restaurant.restaurant_name,
+                'food_description': donation.food_description,
+                'pickup_address': donation.pickup_address,
+                'latitude': donation.restaurant.latitude,
+                'longitude': donation.restaurant.longitude
+            }
+        })
     except Exception as e:
         print(f"Error in cancel_pickup: {e}")
         return JsonResponse({'success': False, 'message': 'An error occurred.'}, status=500)

@@ -209,12 +209,11 @@ function calculateOptimizedRoute() {
             displayPickupRoute(data);
             showToast('Optimal route calculated!', 'success');
         } else {
-            showToast(data.message || 'Failed to calculate route', 'error');
+            // Silently fail if just no routes (e.g. after cancellation)
         }
     })
     .catch(error => {
         console.error('[v0] Error calculating route:', error);
-        showToast('An error occurred. Please try again.', 'error');
     })
     .finally(() => {
         if (btn) {
@@ -458,12 +457,17 @@ function acceptDonation(donationId) {
                         console.log('[v0] Donation removed from available list');
                         
                         // Check if available donations list is empty
-                        const availableList = document.getElementById('available-list');
+                        const availableList = document.getElementById('available-donations-tbody');
                         if (availableList) {
-                            const remainingDonations = availableList.querySelectorAll('[data-donation-id]');
+                            const remainingDonations = availableList.querySelectorAll('tr[id^="donation-row-"]');
                             if (remainingDonations.length === 0) {
                                 console.log('[v0] No more available donations');
-                                availableList.innerHTML = '<div style="text-align: center; padding: 2rem; color: #9ca3af;">No donations available at this time.</div>';
+                                // Replace table with empty state if needed, or just reload if simpler
+                                // But for now we just leave the empty table header or a message
+                                const container = document.getElementById('available-donations-container');
+                                if (container) {
+                                    container.innerHTML = '<p class="empty-state">There are no available donations right now. Check back later.</p>';
+                                }
                             }
                         }
                     }, 300);
@@ -494,7 +498,6 @@ function markAsCollected(donationId) {
     const csrftoken = getCookie('csrftoken');
     const collectBtn = document.getElementById(`collect-btn-${donationId}`);
     const pickupCard = document.getElementById(`pickup-card-${donationId}`);
-    const cancelBtn = document.getElementById(`cancel-btn-${donationId}`);
 
     if (!collectBtn) return;
 
@@ -555,7 +558,7 @@ function markAsCollected(donationId) {
 
 /**
  * Cancel a pickup (reset donation to PENDING)
- * FIXED: Immediately removes item from DOM and refreshes map without full page reload
+ * FIXED: Immediately removes item from DOM, refreshes map, AND adds it back to Available list
  * @param {number} donationId - ID of the donation to cancel
  */
 function cancelPickup(donationId) {
@@ -569,15 +572,12 @@ function cancelPickup(donationId) {
     const pickupCard = document.getElementById(`pickup-card-${donationId}`);
     const cancelBtn = document.getElementById(`cancel-btn-${donationId}`);
     
-    console.log('[v0] cancelBtn found:', !!cancelBtn, 'pickupCard found:', !!pickupCard);
-    
     if (cancelBtn) {
         cancelBtn.disabled = true;
         cancelBtn.textContent = 'Cancelling...';
     }
     
     const url = `/donation/cancel-pickup/${donationId}/`;
-    console.log('[v0] Sending POST request to:', url);
     
     fetch(url, {
         method: 'POST',
@@ -591,23 +591,46 @@ function cancelPickup(donationId) {
         if (data.success) {
             showToast(data.message || 'Pickup cancelled successfully', 'success');
             
-            // FIXED: Immediately remove the card from DOM with animation
+            // 1. Remove the active card from DOM
             if (pickupCard) {
                 pickupCard.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
                 pickupCard.style.opacity = '0';
                 pickupCard.style.transform = 'translateX(-20px)';
                 setTimeout(() => {
                     pickupCard.remove();
-                    console.log('[v0] Pickup card removed from DOM');
                     
-                    // FIXED: Update collected count if applicable
-                    const collectedCountEl = document.getElementById('collected-count');
-                    if (collectedCountEl) {
-                        const currentCount = parseInt(collectedCountEl.textContent) || 0;
-                        collectedCountEl.textContent = currentCount;
+                    // Update collected count if needed (if it was previously collected)
+                    const wasCollected = pickupCard.getAttribute('data-status') === 'collected';
+                    if (wasCollected) {
+                        const collectedCountEl = document.getElementById('collected-count');
+                        if (collectedCountEl) {
+                            const currentCount = parseInt(collectedCountEl.textContent) || 0;
+                            collectedCountEl.textContent = Math.max(0, currentCount - 1);
+                        }
+                    }
+
+                    // Update Active Count
+                    const activeCountEl = document.getElementById('active-count');
+                    let currentActiveCount = 0;
+                    if (activeCountEl) {
+                         // Parse "X/10"
+                         const parts = activeCountEl.textContent.split('/');
+                         currentActiveCount = parseInt(parts[0]) || 0;
+                         currentActiveCount = Math.max(0, currentActiveCount - 1);
+                         activeCountEl.textContent = `${currentActiveCount}/10`;
+                    }
+
+                    // 2. Add donation back to the "Available" table using data returned from server
+                    if (data.donation) {
+                        addDonationToAvailableList(data.donation);
+                    }
+
+                    // 3. Check for "Limit Reached" buttons and re-enable them if count < 10
+                    if (currentActiveCount < 10) {
+                        enableLimitReachedButtons();
                     }
                     
-                    // Re-evaluate map visibility logic after cancelling pickup
+                    // Re-evaluate map visibility logic
                     setTimeout(() => {
                         initializePickupMode();
                     }, 300);
@@ -623,12 +646,80 @@ function cancelPickup(donationId) {
     })
     .catch(error => {
         console.error('[v0] Error cancelling pickup:', error);
-        console.log('[v0] Error details:', error.message);
         if (cancelBtn) {
             cancelBtn.disabled = false;
             cancelBtn.textContent = 'Cancel';
         }
         showToast('An error occurred. Please try again.', 'error');
+    });
+}
+
+/**
+ * Adds a cancelled donation back to the Available Donations list
+ */
+function addDonationToAvailableList(donation) {
+    const container = document.getElementById('available-donations-container');
+    let tbody = document.getElementById('available-donations-tbody');
+    
+    // If table doesn't exist (empty state), create it
+    if (!tbody && container) {
+        container.innerHTML = `
+        <table class="data-table">
+            <thead>
+                <tr><th>Restaurant</th><th>Food Description</th><th>Address</th><th>Action</th></tr>
+            </thead>
+            <tbody id="available-donations-tbody"></tbody>
+        </table>`;
+        tbody = document.getElementById('available-donations-tbody');
+    }
+    
+    if (tbody) {
+        const tr = document.createElement('tr');
+        tr.id = `donation-row-${donation.pk}`;
+        tr.style.opacity = '0'; // For animation
+        tr.innerHTML = `
+            <td data-label="Restaurant"><strong>${donation.restaurant_name}</strong></td>
+            <td data-label="Food Description">${donation.food_description}</td>
+            <td data-label="Address">${donation.pickup_address}</td>
+            <td data-label="Action">
+                <button type="button" class="action-button" id="accept-btn-${donation.pk}"
+                        data-testid="accept-donation-btn-${donation.pk}" onclick="acceptDonation(${donation.pk})">
+                    Accept
+                </button>
+            </td>
+        `;
+        tbody.prepend(tr);
+        
+        // Animate in
+        setTimeout(() => {
+            tr.style.transition = 'opacity 0.5s ease-in';
+            tr.style.opacity = '1';
+        }, 50);
+    }
+}
+
+/**
+ * Enables "Limit Reached" buttons when active count drops below limit
+ */
+function enableLimitReachedButtons() {
+    const disabledButtons = document.querySelectorAll('button[data-testid="pickup-limit-reached-btn"]');
+    disabledButtons.forEach(btn => {
+        // Find the donation ID from the row ID (donation-row-123)
+        const row = btn.closest('tr');
+        if (row && row.id) {
+            const donationId = row.id.replace('donation-row-', '');
+            
+            // Replace the disabled button with an Accept button
+            const newBtn = document.createElement('button');
+            newBtn.type = 'button';
+            newBtn.className = 'action-button';
+            newBtn.id = `accept-btn-${donationId}`;
+            newBtn.setAttribute('data-testid', `accept-donation-btn-${donationId}`);
+            newBtn.onclick = function() { acceptDonation(donationId); };
+            newBtn.textContent = 'Accept';
+            
+            btn.parentNode.replaceChild(newBtn, btn);
+        }
     });
 }
 

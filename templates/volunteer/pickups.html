@@ -235,7 +235,7 @@
 {# Stats Bar #}
 <div class="pickup-stats">
     <div class="stat-card">
-        <div class="stat-value">{{ active_donations.count }}/10</div>
+        <div class="stat-value" id="active-count">{{ active_donations.count }}/10</div>
         <div class="stat-label">Active Pickups</div>
     </div>
     <div class="stat-card {% if collected_count > 0 %}highlight{% endif %}">
@@ -346,36 +346,38 @@
     </form>
 
     <h3>Available Donations for Pickup</h3>
-    {% if available_donations %}
-    <table class="data-table">
-        <thead>
-            <tr><th>Restaurant</th><th>Food Description</th><th>Address</th><th>Action</th></tr>
-        </thead>
-        <tbody id="available-donations-tbody">
-            {% for donation in available_donations %}
-            <tr id="donation-row-{{ donation.pk }}">
-                <td data-label="Restaurant"><strong>{{ donation.restaurant.restaurant_name }}</strong></td>
-                <td data-label="Food Description">{{ donation.food_description }}</td>
-                <td data-label="Address">{{ donation.pickup_address }}</td>
-                <td data-label="Action">
-                    {% if active_donations.count < 10 %}
-                    <button type="button" class="action-button" id="accept-btn-{{ donation.pk }}"
-                            data-testid="accept-donation-btn-{{ donation.pk }}" onclick="acceptDonation({{ donation.pk }})">
-                        Accept
-                    </button>
-                    {% else %}
-                    <button class="action-button" data-testid="pickup-limit-reached-btn" disabled>
-                        Limit Reached (10)
-                    </button>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="empty-state">There are no available donations right now. Check back later.</p>
-    {% endif %}
+    <div id="available-donations-container">
+        {% if available_donations %}
+        <table class="data-table">
+            <thead>
+                <tr><th>Restaurant</th><th>Food Description</th><th>Address</th><th>Action</th></tr>
+            </thead>
+            <tbody id="available-donations-tbody">
+                {% for donation in available_donations %}
+                <tr id="donation-row-{{ donation.pk }}">
+                    <td data-label="Restaurant"><strong>{{ donation.restaurant.restaurant_name }}</strong></td>
+                    <td data-label="Food Description">{{ donation.food_description }}</td>
+                    <td data-label="Address">{{ donation.pickup_address }}</td>
+                    <td data-label="Action">
+                        {% if active_donations.count < 10 %}
+                        <button type="button" class="action-button" id="accept-btn-{{ donation.pk }}"
+                                data-testid="accept-donation-btn-{{ donation.pk }}" onclick="acceptDonation({{ donation.pk }})">
+                            Accept
+                        </button>
+                        {% else %}
+                        <button class="action-button" data-testid="pickup-limit-reached-btn" disabled>
+                            Limit Reached (10)
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state">There are no available donations right now. Check back later.</p>
+        {% endif %}
+    </div>
 </div>
 
 {% endblock %}
