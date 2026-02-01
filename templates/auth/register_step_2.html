@@ -108,6 +108,20 @@
                         </div>
                     </div>
                     
+                    <div id="username-section" style="display: none;">
+                        <hr style="margin: 2rem 0;">
+                        <h3 style="margin-bottom: 1.5rem; color: #334155;">👤 Username</h3>
+                        <div class="form-group">
+                            <label for="username">Username <span class="required-star">*</span></label>
+                            <input type="text" name="username" id="username" required 
+                                   value="{{ prefill_username }}"
+                                   minlength="3" maxlength="150"
+                                   placeholder="Choose a unique username">
+                            <small class="form-help-text">3-150 characters: letters, numbers, underscores, hyphens</small>
+                            <div id="username-feedback" style="margin-top: 8px; font-size: 0.9rem;"></div>
+                        </div>
+                    </div>
+
                     <div id="location-section" class="hidden-fields">
                         <hr style="margin: 2rem 0;">
                         <h3 style="margin-bottom: 1.5rem; color: #334155;">📍 Location & Address</h3>
@@ -163,26 +177,65 @@
                 });
             }
 
+            const usernameSection = document.getElementById('username-section');
+            const usernameField = document.getElementById('username');
+            const usernameFeedback = document.getElementById('username-feedback');
+            
             userTypeSelect.addEventListener('change', function() {
                 const selectedType = this.value;
                 
-                [restaurantFields, ngoFields, volunteerFields, locationSection].forEach(el => el.style.display = 'none');
+                [restaurantFields, ngoFields, volunteerFields, locationSection, usernameSection].forEach(el => el.style.display = 'none');
 
                 if (selectedType === 'RESTAURANT') {
                     restaurantFields.style.display = 'block';
                     locationSection.style.display = 'block';
+                    usernameSection.style.display = 'block';
                 } else if (selectedType === 'NGO') {
                     ngoFields.style.display = 'block';
                     locationSection.style.display = 'block';
+                    usernameSection.style.display = 'block';
                 } else if (selectedType === 'VOLUNTEER') {
                     volunteerFields.style.display = 'block';
                     locationSection.style.display = 'block';
+                    usernameSection.style.display = 'block';
                 }
                 
                 // Update required attributes based on selected type
                 updateRequiredFields(selectedType);
                 
                 setTimeout(() => map.invalidateSize(), 10);
+            });
+            
+            // Real-time username validation
+            usernameField.addEventListener('blur', function() {
+                const username = this.value.trim().toLowerCase();
+                usernameFeedback.innerHTML = '';
+                
+                if (!username) return;
+                
+                // Client-side validation
+                if (username.length < 3) {
+                    usernameFeedback.innerHTML = '<span style="color: #ef4444;">❌ Username must be at least 3 characters</span>';
+                    return;
+                }
+                if (!username.replace('_', '').replace('-', '').match(/^[a-z0-9_-]+$/)) {
+                    usernameFeedback.innerHTML = '<span style="color: #ef4444;">❌ Invalid characters. Use letters, numbers, underscores, hyphens only</span>';
+                    return;
+                }
+                
+                // Server-side check
+                fetch('/api/check-username/?username=' + encodeURIComponent(username))
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.available) {
+                            usernameFeedback.innerHTML = '<span style="color: #10b981;">✓ Username available</span>';
+                        } else {
+                            usernameFeedback.innerHTML = '<span style="color: #ef4444;">❌ ' + data.message + '</span>';
+                        }
+                    })
+                    .catch(err => {
+                        console.error('[v0] Error checking username:', err);
+                    });
             });
 
             let marker = null;

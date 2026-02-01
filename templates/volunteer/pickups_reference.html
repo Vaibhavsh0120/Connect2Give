@@ -1,0 +1,161 @@
+{% extends 'volunteer/base.html' %}
+
+{% block title %}Manage Pickups - {{ block.super }}{% endblock %}
+{% block page_title %}Manage Pickups{% endblock %}
+{% block page_description %}Accept new donations and track your delivery progress.{% endblock %}
+
+{% block volunteer_content %}
+    <div class="tab-navigation">
+        {# This is the main dynamic tab for Pickup/Delivery #}
+        <button class="tab-button {% if view != 'history' %}active{% endif %}" onclick="switchPickupTab(event, 'main-content')">
+            {% if view == 'delivery_route' %}
+                Delivery
+            {% else %}
+                Pickup
+            {% endif %}
+        </button>
+        {# The history tab remains consistent #}
+        <button class="tab-button {% if view == 'history' %}active{% endif %}" onclick="switchPickupTab(event, 'history')">Delivery History</button>
+    </div>
+
+    {# --- Main Content Area for Pickup or Delivery --- #}
+    <div id="main-content" class="tab-content {% if view != 'history' %}active{% endif %}">
+        
+        {# This card shows your currently accepted donations in BOTH modes #}
+        <div class="content-card">
+            <h3>My Active Pickups ({{ active_donations.count }}/10)</h3>
+            {% if active_donations %}
+                <div class="pickup-list">
+                    {% for donation in active_donations %}
+                        <div class="pickup-item pickup-item-content">
+                            <div>
+                                <p><strong>{{ donation.restaurant.restaurant_name }}</strong></p>
+                                <p>{{ donation.food_description }}</p>
+                                <p><small>{{ donation.pickup_address }}</small></p>
+                            </div>
+                            <div>
+                                {% if donation.status == 'ACCEPTED' %}
+                                    <button class="btn btn-sm" id="collect-btn-{{ donation.pk }}" onclick="markAsCollected({{ donation.pk }})">Mark as Picked Up</button>
+                                {% elif donation.status == 'COLLECTED' %}
+                                    <span class="status-badge status-collected">Picked Up</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                {# The button changes depending on the current mode #}
+                <div class="pickup-actions">
+                    {% if view == 'delivery_route' %}
+                        <a href="{% url 'volunteer_manage_pickups' %}" class="btn btn-secondary">Collect More Pickups</a>
+                    {% else %}
+                        <a href="{% url 'volunteer_manage_pickups' %}?view=delivery_route" class="btn">Deliver to Nearest Camp</a>
+                    {% endif %}
+                </div>
+            {% else %}
+                 <p class="empty-state">You have no active pickups.</p>
+            {% endif %}
+        </div>
+        
+        {# The bottom card changes depending on the current mode #}
+        {% if view == 'delivery_route' %}
+            {# DELIVERY MODE: Show the map #}
+            <div class="content-card">
+                <h3>Route to Nearest Camp</h3>
+                {% if nearest_camp %}
+                    <div id="delivery-map"></div>
+                    <div id="delivery-info" class="delivery-info-container"></div>
+                {% else %}
+                    <p class="empty-state">Could not find any active camps from your registered NGOs.</p>
+                {% endif %}
+            </div>
+        {% else %}
+            {# PICKUP MODE: Show available donations #}
+            <div class="content-card">
+                <form method="GET" action="{% url 'volunteer_manage_pickups' %}" style="margin-bottom: 1.5rem;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" name="q" placeholder="Search by restaurant name or pickup address..." value="{{ request.GET.q }}" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <button type="submit" class="action-button">Search</button>
+                        {% if request.GET.q %}
+                        <a href="{% url 'volunteer_manage_pickups' %}" class="action-button-danger">Clear</a>
+                        {% endif %}
+                    </div>
+                </form>
+                
+                <h3>Available Donations for Pickup</h3>
+                {% if available_donations %}
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Restaurant</th><th>Food Description</th><th>Address</th><th>Action</th></tr>
+                    </thead>
+                    <tbody id="available-donations-tbody">
+                        {% for donation in available_donations %}
+                        <tr id="donation-row-{{ donation.pk }}">
+                            <td data-label="Restaurant"><strong>{{ donation.restaurant.restaurant_name }}</strong></td>
+                            <td data-label="Food Description">{{ donation.food_description }}</td>
+                            <td data-label="Address">{{ donation.pickup_address }}</td>
+                            <td data-label="Action">
+                                {% if active_donations.count < 10 %}
+                                <button type="button" class="action-button" id="accept-btn-{{ donation.pk }}" data-testid="accept-donation-btn-{{ donation.pk }}" onclick="acceptDonation({{ donation.pk }})">Accept</button>
+                                {% else %}
+                                <button class="action-button" data-testid="pickup-limit-reached-btn" disabled>Pickup limit reached</button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="empty-state">There are no available donations right now.</p>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    {# --- History Content Area (unchanged) --- #}
+    <div id="history" class="tab-content {% if view == 'history' %}active{% endif %}">
+        <div class="content-card">
+            <h3>My Delivery History</h3>
+            <table class="data-table">
+                 <thead>
+                    <tr><th>Description</th><th>From</th><th>Delivered To</th><th>Status</th><th>Date</th></tr>
+                </thead>
+                <tbody>
+                    {% for donation in delivery_history %}
+                    <tr>
+                        <td data-label="Description">{{ donation.food_description }}</td>
+                        <td data-label="From">{{ donation.restaurant.restaurant_name }}</td>
+                        <td data-label="Delivered To">{{ donation.target_camp.name|default:"N/A" }}</td>
+                        <td data-label="Status"><span class="status-badge status-{{ donation.status|lower }}">{{ donation.get_status_display }}</span></td>
+                        <td data-label="Date">{{ donation.delivered_at|date:"d M Y, H:i" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="empty-state">You have no completed deliveries.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+
+{# Load common utilities #}
+{% load static %}
+<script src="{% static 'js/common.js' %}"></script>
+<script src="{% static 'js/volunteer_pickups.js' %}"></script>
+
+{# Pass Django template data to JavaScript #}
+{% if view == 'delivery_route' %}
+    {{ volunteer_location_data|json_script:"volunteer-location-data" }}
+    {% if nearest_camp_data %}
+        {{ nearest_camp_data|json_script:"nearest-camp-data" }}
+    {% endif %}
+{% endif %}
+
+{# Set current view as data attribute for JavaScript #}
+<script>
+    document.body.dataset.currentView = "{{ view }}";
+</script>
+{% endblock scripts %}
