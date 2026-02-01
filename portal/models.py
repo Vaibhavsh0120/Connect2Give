@@ -29,7 +29,8 @@ class RestaurantProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True, related_name='restaurant_profile')
     restaurant_name = models.CharField(max_length=255, validators=[alphabetic_validator])
     address = models.TextField()
-    phone_number = models.CharField(max_length=15)
+    # Unique across restaurants (Form will validate system-wide)
+    phone_number = models.CharField(max_length=15, unique=True)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
     profile_picture = models.ImageField(upload_to='profile_pictures/restaurants/', null=True, blank=True)
@@ -42,7 +43,8 @@ class VolunteerProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True, related_name='volunteer_profile')
     full_name = models.CharField(max_length=255, validators=[alphabetic_validator])
     email = models.EmailField(blank=True, null=True)
-    phone_number = models.CharField(max_length=15, blank=True, null=True)
+    # Unique across volunteers (Form will validate system-wide)
+    phone_number = models.CharField(max_length=15, blank=True, null=True, unique=True)
     aadhar_number = models.CharField(max_length=12, blank=True, null=True, unique=True, help_text="12-digit Aadhar number")
     address = models.TextField(blank=True, null=True)
     skills = models.CharField(max_length=255, blank=True, null=True, help_text="e.g., Driving, Cooking, Medical")
@@ -66,8 +68,10 @@ class NGOProfile(models.Model):
     address = models.TextField()
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    # Unique across NGOs (Form will validate system-wide)
     contact_number = models.CharField(
         max_length=10, 
+        unique=True,
         validators=[
             RegexValidator(
                 regex=r'^\d{10}$',

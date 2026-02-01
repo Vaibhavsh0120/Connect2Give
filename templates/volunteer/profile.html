@@ -114,20 +114,30 @@
                         {% endif %}
                         <p class="form-help-text">Your unique username for login and display.</p>
                     </div>
+                    
                     <div class="form-group">
                         {{ form.full_name.label_tag }}
                         {{ form.full_name }}
                     </div>
+
+                    <div class="form-group">
+                        {{ form.email.label_tag }}
+                        {{ form.email }}
+                    </div>
+
                     <div class="form-group">
                         {{ form.phone_number.label_tag }}
                         {{ form.phone_number }}
                     </div>
+
+                    <div class="form-group">
+                        {{ form.aadhar_number.label_tag }}
+                        {{ form.aadhar_number }}
+                    </div>
                     
-                    <!-- Skills Section with View/Edit Mode -->
                     <div class="form-group">
                         <label>Skills</label>
                         
-                        <!-- View Mode: Show only selected skills as badges -->
                         <div class="skills-display-container" id="skills-display">
                             <div class="skills-badges">
                                 {% if form.instance.skills %}
@@ -147,7 +157,6 @@
                             </div>
                         </div>
                         
-                        <!-- Edit Mode: Show all skills as checkboxes -->
                         <div class="skills-edit-container" id="skills-edit">
                             <div class="skills-checkbox-group">
                                 <label class="skill-checkbox-item">
@@ -238,7 +247,6 @@
     </div>
 </div>
 
-<!-- Include the modern image cropper component -->
 {% include 'components/image_cropper_modal.html' %}
 {% endblock volunteer_content %}
 
@@ -246,7 +254,7 @@
 {{ block.super }}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // --- MAP INITIALIZATION (with controls removed) ---
+        // --- MAP INITIALIZATION ---
         const initialLat = parseFloat("{{ form.instance.latitude|default:'28.6139'|escapejs }}");
         const initialLon = parseFloat("{{ form.instance.longitude|default:'77.2090'|escapejs }}");
         const initialZoom = parseInt("{{ form.instance.latitude|yesno:'15,11' }}");
@@ -313,7 +321,6 @@
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
                     
-                    // Reverse geocode to get address
                     fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
                         .then(r => r.json())
                         .then(d => {
@@ -355,14 +362,7 @@
                     
                     if (btn) {
                         btn.disabled = false;
-                        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;">
-                            <circle cx="12" cy="12" r="10"/>
-                            <circle cx="12" cy="12" r="3"/>
-                            <line x1="12" y1="2" x2="12" y2="6"/>
-                            <line x1="12" y1="18" x2="12" y2="22"/>
-                            <line x1="2" y1="12" x2="6" y2="12"/>
-                            <line x1="18" y1="12" x2="22" y2="12"/>
-                        </svg> Find My Location`;
+                        btn.innerHTML = 'Find My Location';
                     }
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -386,14 +386,10 @@
         const saveBtn = document.getElementById('save-changes-btn');
         const imageUploadBtns = document.querySelectorAll('.image-upload-btn');
         const mapActionBtns = document.querySelectorAll('.map-action-btn');
-        const skillsDisplay = document.getElementById('skills-display');
-        const skillsEdit = document.getElementById('skills-edit');
 
-        // Disable form fields by default
         function setReadOnlyMode() {
             document.body.classList.remove('edit-mode');
             
-            // Disable all input fields except hidden ones
             const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]), textarea, select');
             inputs.forEach(input => {
                 input.setAttribute('readonly', 'readonly');
@@ -401,27 +397,17 @@
                 input.style.backgroundColor = '#f9fafb';
             });
             
-            // Disable checkboxes
             const checkboxes = form.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(cb => {
-                cb.disabled = true;
-            });
+            checkboxes.forEach(cb => { cb.disabled = true; });
 
-            // Hide image upload buttons
             imageUploadBtns.forEach(btn => btn.style.display = 'none');
-            
-            // Disable map action buttons
             mapActionBtns.forEach(btn => btn.disabled = true);
-            
-            // Disable map clicks
             map.off('click');
 
-            // Show Edit button, hide Save button
             editBtn.style.display = 'inline-block';
             saveBtn.style.display = 'none';
         }
 
-        // Enable edit mode
         window.enableEditMode = function() {
             document.body.classList.add('edit-mode');
             
@@ -432,19 +418,12 @@
                 input.style.backgroundColor = 'white';
             });
             
-            // Enable checkboxes
             const checkboxes = form.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(cb => {
-                cb.disabled = false;
-            });
+            checkboxes.forEach(cb => { cb.disabled = false; });
 
-            // Show image upload buttons
             imageUploadBtns.forEach(btn => btn.style.display = 'inline-block');
-            
-            // Enable map action buttons
             mapActionBtns.forEach(btn => btn.disabled = false);
             
-            // Enable map clicks
             map.on('click', function (e) {
                 const lat = e.latlng.lat;
                 const lon = e.latlng.lng;
@@ -453,12 +432,10 @@
                     .then(d => updateMarkerAndFields(lat, lon, d.display_name || 'Location selected'));
             });
 
-            // Hide Edit button, show Save button
             editBtn.style.display = 'none';
             saveBtn.style.display = 'inline-block';
         }
 
-        // Initialize in read-only mode
         setReadOnlyMode();
     });
 </script>

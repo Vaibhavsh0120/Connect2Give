@@ -23,13 +23,30 @@
                         {% endif %}
                         <p class="form-help-text">Your unique username for login and display.</p>
                     </div>
+                    
                     <div class="form-group">
                         {{ form.ngo_name.label_tag }}
                         {{ form.ngo_name }}
                     </div>
+
                     <div class="form-group">
-                        {{ form.contact_person.label_tag }}
-                        {{ form.contact_person }}
+                        {{ form.full_name.label_tag }}
+                        {{ form.full_name }}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.email.label_tag }}
+                        {{ form.email }}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.contact_number.label_tag }}
+                        {{ form.contact_number }}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.registration_number.label_tag }}
+                        {{ form.registration_number }}
                     </div>
                 </div>
 
@@ -66,7 +83,6 @@
                 </div>
             </div>
 
-            <!-- Hidden Django form fields for the cropped images -->
             <div style="display: none;">
                 {{ form.profile_picture }}
                 {{ form.banner_image }}
@@ -95,7 +111,6 @@
     </div>
 </div>
 
-<!-- Include the modern image cropper component -->
 {% include 'components/image_cropper_modal.html' %}
 {% endblock %}
 
@@ -105,7 +120,7 @@
     let map;
 
     document.addEventListener('DOMContentLoaded', function () {
-        // --- MAP INITIALIZATION (with controls removed) ---
+        // --- MAP INITIALIZATION ---
         const initialLat = parseFloat("{{ form.instance.latitude|default:'28.6139'|escapejs }}");
         const initialLon = parseFloat("{{ form.instance.longitude|default:'77.2090'|escapejs }}");
         const initialZoom = parseInt("{{ form.instance.latitude|yesno:'15,11' }}");

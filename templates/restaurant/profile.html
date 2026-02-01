@@ -24,10 +24,22 @@
                         {% endif %}
                         <p class="form-help-text">Your unique username for login and display.</p>
                     </div>
+                    
                     <div class="form-group">
                         {{ form.restaurant_name.label_tag }}
                         {{ form.restaurant_name }}
                     </div>
+
+                    <div class="form-group">
+                        {{ form.full_name.label_tag }}
+                        {{ form.full_name }}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.email.label_tag }}
+                        {{ form.email }}
+                    </div>
+
                     <div class="form-group">
                         {{ form.phone_number.label_tag }}
                         {{ form.phone_number }}
@@ -51,7 +63,6 @@
                 </div>
             </div>
 
-            <!-- Hidden Django form field for the cropped image -->
             <div style="display: none;">
                 {{ form.profile_picture }}
             </div>
@@ -79,7 +90,6 @@
     </div>
 </div>
 
-<!-- Include the modern image cropper component -->
 {% include 'components/image_cropper_modal.html' %}
 {% endblock restaurant_content %}
 
@@ -87,7 +97,7 @@
 {{ block.super }}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // --- MAP INITIALIZATION (with controls removed) ---
+        // --- MAP INITIALIZATION ---
         const initialLat = parseFloat("{{ form.instance.latitude|default:'28.6139'|escapejs }}");
         const initialLon = parseFloat("{{ form.instance.longitude|default:'77.2090'|escapejs }}");
         const initialZoom = parseInt("{{ form.instance.latitude|yesno:'15,11' }}");
