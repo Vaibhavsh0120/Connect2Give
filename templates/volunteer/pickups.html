@@ -51,14 +51,15 @@
         margin-bottom: 1.5rem;
         border: 1px solid #e5e7eb;
         position: relative;
+        min-height: 400px; /* Ensure height even if empty */
+        background: #f3f4f6;
     }
     #pickup-route-map {
         height: 400px;
         width: 100%;
+        z-index: 1;
     }
     
-    /* LEGEND REMOVED HERE as requested */
-
     /* Route Info Banner */
     .route-info-banner {
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -385,6 +386,10 @@
 {% block scripts %}
 {{ block.super }}
 {% load static %}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
 <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 

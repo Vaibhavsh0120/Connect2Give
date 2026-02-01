@@ -15,49 +15,56 @@ let liveTrackingWatchId = null;
 let currentVolunteerPosition = null;
 
 // ============ CUSTOM ICONS ============
-const bikeIcon = L.divIcon({
-    className: 'volunteer-marker',
-    html: `<div style="
-        width: 36px; height: 36px; 
-        background: #10b981; 
-        border-radius: 50%; 
-        border: 3px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        display: flex; align-items: center; justify-content: center;
-    ">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-            <circle cx="5.5" cy="17.5" r="3.5"/>
-            <circle cx="18.5" cy="17.5" r="3.5"/>
-            <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/>
-        </svg>
-    </div>`,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -18]
-});
+let bikeIcon = null;
+let campIcon = null;
 
-const campIcon = L.divIcon({
-    className: 'camp-marker',
-    html: `<div style="
-        width: 36px; height: 36px; 
-        background: #ef4444; 
-        border-radius: 50%; 
-        border: 3px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        display: flex; align-items: center; justify-content: center;
-    ">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            <polyline points="9 22 9 12 15 12 15 22"/>
-        </svg>
-    </div>`,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -18]
-});
+// Initialize icons safely (only if L is available to prevent crashes)
+if (typeof L !== 'undefined') {
+    bikeIcon = L.divIcon({
+        className: 'volunteer-marker',
+        html: `<div style="
+            width: 36px; height: 36px; 
+            background: #10b981; 
+            border-radius: 50%; 
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: flex; align-items: center; justify-content: center;
+        ">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <circle cx="5.5" cy="17.5" r="3.5"/>
+                <circle cx="18.5" cy="17.5" r="3.5"/>
+                <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/>
+            </svg>
+        </div>`,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor: [0, -18]
+    });
 
-// Create numbered restaurant icon
+    campIcon = L.divIcon({
+        className: 'camp-marker',
+        html: `<div style="
+            width: 36px; height: 36px; 
+            background: #ef4444; 
+            border-radius: 50%; 
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: flex; align-items: center; justify-content: center;
+        ">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+        </div>`,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor: [0, -18]
+    });
+}
+
+// Create numbered restaurant icon safely
 function createRestaurantIcon(number) {
+    if (typeof L === 'undefined') return null;
     return L.divIcon({
         className: 'restaurant-marker',
         html: `<div style="
@@ -77,13 +84,23 @@ function createRestaurantIcon(number) {
 
 // ============ PAGE INITIALIZATION ============
 document.addEventListener('DOMContentLoaded', function () {
-    // Start live location tracking
-    startLiveLocationTracking();
+    // CRITICAL CHECK: Verify Leaflet is loaded
+    if (typeof L === 'undefined') {
+        console.error('[v0] Leaflet Library is missing! Map will not load.');
+        const mapContainer = document.getElementById('pickup-map-container');
+        if (mapContainer) {
+            mapContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#ef4444; font-weight:bold;">Error: Map resources not loaded. Please refresh the page.</div>';
+        }
+        // We do NOT return here, so that button handlers (Cancel/Collect) still work!
+    } else {
+        // Only start map logic if library exists
+        setTimeout(() => {
+            initializePickupMode();
+        }, 300);
+    }
     
-    // Auto-initialize map on page load
-    setTimeout(() => {
-        initializePickupMode();
-    }, 300);
+    // Always start GPS tracking (it's independent of map library)
+    startLiveLocationTracking();
 });
 
 /**
@@ -94,7 +111,6 @@ function initializePickupMode() {
     if (!pickupList) return;
     
     const pickupCards = pickupList.querySelectorAll('[data-donation-id]');
-    console.log('[v0] Total pickup cards found:', pickupCards.length);
     
     if (pickupCards.length === 0) {
         // No pickups at all
@@ -110,15 +126,11 @@ function initializePickupMode() {
         card.getAttribute('data-status') === 'collected'
     );
     
-    console.log('[v0] Uncollected pickups:', uncollectedPickups.length, 'Collected pickups:', collectedPickups.length);
-    
     if (uncollectedPickups.length > 0) {
         // Scenario 1: Show map with route to uncollected restaurants
-        console.log('[v0] Scenario 1: There are uncollected pickups - showing map');
         showPickupMapMode();
     } else if (collectedPickups.length > 0) {
         // Scenario 2: All collected, show delivery button
-        console.log('[v0] Scenario 2: All items collected - showing delivery button');
         hidePickupMapMode();
         showDeliveryButton();
     } else {
@@ -179,7 +191,6 @@ function hideAllPickupMode() {
 
 /**
  * Calculate and display optimized pickup route
- * Called when user clicks "Calculate Best Route" button
  */
 function calculateOptimizedRoute() {
     const btn = document.getElementById('calculate-route-btn');
@@ -234,6 +245,8 @@ function calculateOptimizedRoute() {
  * @param {Object} data - Route data from API
  */
 function displayPickupRoute(data) {
+    if (typeof L === 'undefined') return;
+
     const mapContainer = document.getElementById('pickup-map-container');
     const infoBanner = document.getElementById('route-info-banner');
     
@@ -251,17 +264,6 @@ function displayPickupRoute(data) {
     if (distanceEl) distanceEl.textContent = data.total_distance_km;
     if (timeEl) timeEl.textContent = data.estimated_time_minutes;
     if (stopsEl) stopsEl.textContent = data.total_pickups;
-    
-    // Update pickup order badges in the list
-    data.route.forEach((loc, index) => {
-        if (index > 0) { // Skip volunteer location (index 0)
-            const badge = document.getElementById(`order-badge-${loc.id}`);
-            if (badge) {
-                badge.textContent = index;
-                badge.style.display = 'inline-flex';
-            }
-        }
-    });
     
     // Initialize or reinitialize the map
     if (pickupMapInstance) {
@@ -285,15 +287,24 @@ function displayPickupRoute(data) {
     data.route.forEach((loc, index) => {
         if (index === 0) {
             // Volunteer marker
-            volunteerPickupMarker = L.marker([loc.lat, loc.lon], { 
-                icon: bikeIcon,
-                zIndexOffset: 1000
-            }).addTo(pickupMapInstance);
+            if (bikeIcon) {
+                volunteerPickupMarker = L.marker([loc.lat, loc.lon], { 
+                    icon: bikeIcon,
+                    zIndexOffset: 1000
+                }).addTo(pickupMapInstance);
+            }
         } else {
             // Restaurant markers
             L.marker([loc.lat, loc.lon], { 
                 icon: createRestaurantIcon(index) 
             }).addTo(pickupMapInstance).bindPopup(`<strong>Stop ${index}: ${loc.name}</strong>`);
+            
+            // Update the badge number in the list
+            const badge = document.getElementById(`order-badge-${loc.id}`);
+            if (badge) {
+                badge.textContent = index;
+                badge.style.display = 'inline-flex';
+            }
         }
     });
 
@@ -323,9 +334,11 @@ function displayPickupRoute(data) {
 
 /**
  * FALLBACK: Render map with markers only (when route calc fails)
- * This ensures the map is always visible even if the API or Location fails.
+ * This fixes the "Blank Map" issue on devices without GPS/Location permissions.
  */
 function renderFallbackMap() {
+    if (typeof L === 'undefined') return;
+
     const mapContainer = document.getElementById('pickup-map-container');
     if (!mapContainer) return;
 
@@ -352,7 +365,7 @@ function renderFallbackMap() {
     let hasPoints = false;
 
     // Add current location if available
-    if (currentVolunteerPosition) {
+    if (currentVolunteerPosition && bikeIcon) {
         volunteerPickupMarker = L.marker([currentVolunteerPosition.lat, currentVolunteerPosition.lon], {
             icon: bikeIcon
         }).addTo(pickupMapInstance);
@@ -381,16 +394,13 @@ function renderFallbackMap() {
     if (hasPoints) {
         pickupMapInstance.fitBounds(bounds, { padding: [50, 50] });
     } else {
-        // Default view if no points found (e.g. Delhi)
-        pickupMapInstance.setView([28.6139, 77.2090], 11); 
+        // Default view (e.g. India center) if no points found
+        pickupMapInstance.setView([20.5937, 78.9629], 5); 
     }
 }
 
 // ============ LIVE LOCATION TRACKING ============
 
-/**
- * Start GPS-based live location tracking
- */
 function startLiveLocationTracking() {
     if (!navigator.geolocation) {
         console.warn('[v0] Geolocation not supported');
@@ -400,7 +410,6 @@ function startLiveLocationTracking() {
     liveTrackingWatchId = navigator.geolocation.watchPosition(
         (position) => {
             const { latitude, longitude, accuracy } = position.coords;
-            
             currentVolunteerPosition = { lat: latitude, lon: longitude };
             
             // Update volunteer marker on pickup map
@@ -422,9 +431,6 @@ function startLiveLocationTracking() {
     );
 }
 
-/**
- * Stop live location tracking
- */
 function stopLiveLocationTracking() {
     if (liveTrackingWatchId !== null) {
         navigator.geolocation.clearWatch(liveTrackingWatchId);
@@ -432,13 +438,9 @@ function stopLiveLocationTracking() {
     }
 }
 
-// Throttle location updates to server
 let lastLocationUpdate = 0;
 const LOCATION_UPDATE_INTERVAL = 30000; // 30 seconds
 
-/**
- * Send location update to server
- */
 function sendLocationUpdate(latitude, longitude, accuracy) {
     const now = Date.now();
     if (now - lastLocationUpdate < LOCATION_UPDATE_INTERVAL) return;
@@ -464,17 +466,12 @@ function sendLocationUpdate(latitude, longitude, accuracy) {
 
 /**
  * Accept a donation via AJAX
- * NO RELOAD: DOM updated async, item moved from available to active pickups
- * @param {number} donationId - ID of the donation to accept
  */
 function acceptDonation(donationId) {
     const csrftoken = getCookie('csrftoken');
     const acceptBtn = document.getElementById(`accept-btn-${donationId}`);
     
-    if (!acceptBtn) {
-        console.error('[v0] Accept button not found for donation:', donationId);
-        return;
-    }
+    if (!acceptBtn) return;
     
     acceptBtn.disabled = true;
     acceptBtn.textContent = 'Accepting...';
@@ -496,9 +493,8 @@ function acceptDonation(donationId) {
             acceptBtn.style.color = 'white';
             acceptBtn.style.cursor = 'default';
             
-            showToast(data.message || 'Donation accepted! Please pick it up within 30 minutes.', 'success');
+            showToast(data.message || 'Donation accepted!', 'success');
             
-            // NO RELOAD: Smoothly remove from available list and add to active list
             setTimeout(() => {
                 const row = document.getElementById(`donation-row-${donationId}`);
                 if (row) {
@@ -507,28 +503,19 @@ function acceptDonation(donationId) {
                     row.style.transform = 'translateX(-20px)';
                     setTimeout(() => {
                         row.remove();
-                        console.log('[v0] Donation removed from available list');
                         
-                        // NEW: Immediately add to active list if data returned from server
                         if (data.donation) {
                             addPickupCardToActiveList(data.donation);
-                            // Refresh map logic to include new point
-                            setTimeout(() => {
-                                initializePickupMode();
-                            }, 500);
+                            setTimeout(() => { initializePickupMode(); }, 500);
                         } else {
-                            // Fallback if backend doesn't send data yet (should not happen with updated view)
-                            setTimeout(() => {
-                                initializePickupMode();
-                            }, 300);
+                            setTimeout(() => { initializePickupMode(); }, 300);
                         }
                         
-                        // Check if available donations list is empty
+                        // Check empty state
                         const availableList = document.getElementById('available-donations-tbody');
                         if (availableList) {
                             const remainingDonations = availableList.querySelectorAll('tr[id^="donation-row-"]');
                             if (remainingDonations.length === 0) {
-                                console.log('[v0] No more available donations');
                                 const container = document.getElementById('available-donations-container');
                                 if (container) {
                                     container.innerHTML = '<p class="empty-state">There are no available donations right now. Check back later.</p>';
@@ -554,21 +541,13 @@ function acceptDonation(donationId) {
     });
 }
 
-/**
- * Helper: Add a new pickup card to the active list dynamically
- */
 function addPickupCardToActiveList(donation) {
     const list = document.getElementById('pickup-list');
-    
-    // If list doesn't exist (e.g., page loaded with 0 pickups and rendered the "No Active Pickups" empty state),
-    // we must reload because the HTML structure for the map and list isn't there.
     if (!list) {
-        console.log('[v0] Pickup list container not found, reloading to render active state...');
         window.location.reload();
         return;
     }
 
-    // Check if already exists to prevent duplicates
     if (document.getElementById(`pickup-card-${donation.pk}`)) return;
 
     const card = document.createElement('div');
@@ -600,7 +579,6 @@ function addPickupCardToActiveList(donation) {
     
     list.appendChild(card);
     
-    // Update active count in stats bar
     const activeCountEl = document.getElementById('active-count');
     if (activeCountEl) {
          const parts = activeCountEl.textContent.split('/');
@@ -608,16 +586,10 @@ function addPickupCardToActiveList(donation) {
          activeCountEl.textContent = `${current + 1}/10`;
     }
     
-    // Ensure map container is visible
     const mapContainer = document.getElementById('pickup-map-container');
     if (mapContainer) mapContainer.style.display = 'block';
 }
 
-/**
- * Mark a donation as collected via AJAX
- * FIXED: Keeps item in list, shows "Collected" badge, checks if ALL collected, shows delivery button
- * @param {number} donationId - ID of the donation to mark as collected
- */
 function markAsCollected(donationId) {
     const csrftoken = getCookie('csrftoken');
     const collectBtn = document.getElementById(`collect-btn-${donationId}`);
@@ -640,30 +612,24 @@ function markAsCollected(donationId) {
         if (data.success) {
             showToast(data.message || 'Marked as collected!', 'success');
             
-            // PERSISTENT: Keep item in list, replace button with "Collected" badge
             const statusDiv = collectBtn.parentElement;
-            collectBtn.style.display = 'none'; // Hide the button
+            collectBtn.style.display = 'none'; 
             
-            // Create and show collected badge
             const badge = document.createElement('span');
             badge.className = 'status-badge status-collected';
             badge.textContent = 'Collected';
             statusDiv.insertBefore(badge, collectBtn);
             
-            // Update the card's data-status attribute
             if (pickupCard) {
                 pickupCard.setAttribute('data-status', 'collected');
             }
             
-            // Update collected count
             const collectedCountEl = document.getElementById('collected-count');
             if (collectedCountEl) {
                 const currentCount = parseInt(collectedCountEl.textContent) || 0;
                 collectedCountEl.textContent = currentCount + 1;
             }
             
-            // Re-evaluate map visibility logic after marking as collected
-            // This will re-trigger route calculation if uncollected items remain
             setTimeout(() => {
                 initializePickupMode();
             }, 300);
@@ -683,8 +649,6 @@ function markAsCollected(donationId) {
 
 /**
  * Cancel a pickup (reset donation to PENDING)
- * FIXED: Immediately removes item from DOM, refreshes map, AND adds it back to Available list
- * @param {number} donationId - ID of the donation to cancel
  */
 function cancelPickup(donationId) {
     console.log('[v0] cancelPickup called for donation ID:', donationId);
@@ -716,7 +680,6 @@ function cancelPickup(donationId) {
         if (data.success) {
             showToast(data.message || 'Pickup cancelled successfully', 'success');
             
-            // 1. Remove the active card from DOM
             if (pickupCard) {
                 pickupCard.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
                 pickupCard.style.opacity = '0';
@@ -724,7 +687,7 @@ function cancelPickup(donationId) {
                 setTimeout(() => {
                     pickupCard.remove();
                     
-                    // Update collected count if needed (if it was previously collected)
+                    // Update collected count if needed
                     const wasCollected = pickupCard.getAttribute('data-status') === 'collected';
                     if (wasCollected) {
                         const collectedCountEl = document.getElementById('collected-count');
@@ -738,25 +701,20 @@ function cancelPickup(donationId) {
                     const activeCountEl = document.getElementById('active-count');
                     let currentActiveCount = 0;
                     if (activeCountEl) {
-                         // Parse "X/10"
                          const parts = activeCountEl.textContent.split('/');
                          currentActiveCount = parseInt(parts[0]) || 0;
                          currentActiveCount = Math.max(0, currentActiveCount - 1);
                          activeCountEl.textContent = `${currentActiveCount}/10`;
                     }
 
-                    // 2. Add donation back to the "Available" table using data returned from server
                     if (data.donation) {
                         addDonationToAvailableList(data.donation);
                     }
 
-                    // 3. Check for "Limit Reached" buttons and re-enable them if count < 10
                     if (currentActiveCount < 10) {
                         enableLimitReachedButtons();
                     }
                     
-                    // Re-evaluate map visibility logic
-                    // This will refresh the route to exclude the cancelled item
                     setTimeout(() => {
                         initializePickupMode();
                     }, 300);
@@ -780,14 +738,10 @@ function cancelPickup(donationId) {
     });
 }
 
-/**
- * Adds a cancelled donation back to the Available Donations list
- */
 function addDonationToAvailableList(donation) {
     const container = document.getElementById('available-donations-container');
     let tbody = document.getElementById('available-donations-tbody');
     
-    // If table doesn't exist (empty state), create it
     if (!tbody && container) {
         container.innerHTML = `
         <table class="data-table">
@@ -802,7 +756,7 @@ function addDonationToAvailableList(donation) {
     if (tbody) {
         const tr = document.createElement('tr');
         tr.id = `donation-row-${donation.pk}`;
-        tr.style.opacity = '0'; // For animation
+        tr.style.opacity = '0';
         tr.innerHTML = `
             <td data-label="Restaurant"><strong>${donation.restaurant_name}</strong></td>
             <td data-label="Food Description">${donation.food_description}</td>
@@ -815,8 +769,6 @@ function addDonationToAvailableList(donation) {
             </td>
         `;
         tbody.prepend(tr);
-        
-        // Animate in
         setTimeout(() => {
             tr.style.transition = 'opacity 0.5s ease-in';
             tr.style.opacity = '1';
@@ -824,18 +776,12 @@ function addDonationToAvailableList(donation) {
     }
 }
 
-/**
- * Enables "Limit Reached" buttons when active count drops below limit
- */
 function enableLimitReachedButtons() {
     const disabledButtons = document.querySelectorAll('button[data-testid="pickup-limit-reached-btn"]');
     disabledButtons.forEach(btn => {
-        // Find the donation ID from the row ID (donation-row-123)
         const row = btn.closest('tr');
         if (row && row.id) {
             const donationId = row.id.replace('donation-row-', '');
-            
-            // Replace the disabled button with an Accept button
             const newBtn = document.createElement('button');
             newBtn.type = 'button';
             newBtn.className = 'action-button';
@@ -843,7 +789,6 @@ function enableLimitReachedButtons() {
             newBtn.setAttribute('data-testid', `accept-donation-btn-${donationId}`);
             newBtn.onclick = function() { acceptDonation(donationId); };
             newBtn.textContent = 'Accept';
-            
             btn.parentNode.replaceChild(newBtn, btn);
         }
     });
@@ -851,11 +796,6 @@ function enableLimitReachedButtons() {
 
 // ============ NGO REGISTRATION ACTIONS ============
 
-/**
- * Register with an NGO via AJAX
- * NO RELOAD: DOM updated async, item moved from available to registered
- * @param {number} ngoId - ID of the NGO to register with
- */
 function registerWithNGO(ngoId) {
     const csrftoken = getCookie('csrftoken');
     const registerBtn = document.getElementById(`register-btn-${ngoId}`);
@@ -876,31 +816,15 @@ function registerWithNGO(ngoId) {
     .then(data => {
         if (data.success) {
             showToast(data.message, 'success');
-            
-            // NO RELOAD: Remove from available, add to registered
             setTimeout(() => {
                 const availableRow = document.getElementById(`available-ngo-${ngoId}`);
                 if (availableRow) {
-                    availableRow.style.transition = 'opacity 0.3s ease-out';
-                    availableRow.style.opacity = '0';
-                    setTimeout(() => {
-                        availableRow.remove();
-                        
-                        // Check if available list is empty
-                        const availableList = document.getElementById('available-ngos-tbody');
-                        if (availableList && availableList.querySelectorAll('tr:not(:has(.empty-state))').length === 0) {
-                            availableList.innerHTML = '<tr><td colspan="3"><div class="empty-state"><p>No New NGOs Available</p></div></td></tr>';
-                        }
-                    }, 300);
+                    availableRow.remove();
                 }
                 
-                // Remove empty row if exists in registered list
                 const registeredEmpty = document.getElementById('registered-empty');
-                if (registeredEmpty) {
-                    registeredEmpty.remove();
-                }
+                if (registeredEmpty) registeredEmpty.remove();
                 
-                // Add to registered list (requires data from API response)
                 if (data.ngo_name) {
                     const registeredList = document.getElementById('registered-ngos-tbody');
                     if (registeredList) {
@@ -915,7 +839,6 @@ function registerWithNGO(ngoId) {
                             </td>
                         `;
                         registeredList.appendChild(newRow);
-                        console.log('[v0] NGO added to registered list');
                     }
                 }
             }, 300);
@@ -933,15 +856,8 @@ function registerWithNGO(ngoId) {
     });
 }
 
-/**
- * Unregister from an NGO via AJAX
- * NO RELOAD: DOM updated async, item moved from registered to available
- * @param {number} ngoId - ID of the NGO to unregister from
- */
 function unregisterFromNGO(ngoId) {
-    if (!confirm('Are you sure you want to unregister from this NGO?')) {
-        return;
-    }
+    if (!confirm('Are you sure you want to unregister from this NGO?')) return;
     
     const csrftoken = getCookie('csrftoken');
     const unregisterBtn = document.querySelector(`button[onclick="unregisterFromNGO(${ngoId})"]`);
@@ -962,36 +878,15 @@ function unregisterFromNGO(ngoId) {
     .then(data => {
         if (data.success) {
             showToast(data.message, 'success');
-            
-            // NO RELOAD: Remove from registered list
             setTimeout(() => {
                 const registeredRow = document.getElementById(`registered-ngo-${ngoId}`);
-                if (registeredRow) {
-                    registeredRow.style.transition = 'opacity 0.3s ease-out';
-                    registeredRow.style.opacity = '0';
-                    setTimeout(() => {
-                        registeredRow.remove();
-                        
-                        // Check if registered list is empty
-                        const registeredList = document.getElementById('registered-ngos-tbody');
-                        if (registeredList && registeredList.querySelectorAll('tr:not(:has(.empty-state))').length === 0) {
-                            const emptyRow = document.createElement('tr');
-                            emptyRow.id = 'registered-empty';
-                            emptyRow.innerHTML = '<td colspan="3"><div class="empty-state"><p>Not Registered with Any NGOs</p></div></td>';
-                            registeredList.appendChild(emptyRow);
-                        }
-                    }, 300);
-                }
+                if (registeredRow) registeredRow.remove();
                 
-                // Add back to available list if data has ngo info
                 if (data.ngo_name) {
                     const availableList = document.getElementById('available-ngos-tbody');
                     if (availableList) {
-                        // Remove empty state if exists
                         const emptyRow = availableList.querySelector('tr:has(.empty-state)');
-                        if (emptyRow) {
-                            emptyRow.remove();
-                        }
+                        if (emptyRow) emptyRow.remove();
                         
                         const newRow = document.createElement('tr');
                         newRow.id = `available-ngo-${ngoId}`;
@@ -1003,7 +898,6 @@ function unregisterFromNGO(ngoId) {
                             </td>
                         `;
                         availableList.appendChild(newRow);
-                        console.log('[v0] NGO returned to available list');
                     }
                 }
             }, 300);
@@ -1031,7 +925,6 @@ function unregisterFromNGO(ngoId) {
 function proceedToDelivery() {
     console.log('[v0] Proceeding to delivery');
     
-    // Fetch available camps and find the nearest one
     fetch('/api/nearest-camp/', {
         method: 'GET',
         headers: {
@@ -1042,7 +935,6 @@ function proceedToDelivery() {
     .then(response => response.json())
     .then(data => {
         if (data.success && data.camp_id) {
-            // Found a camp, proceed with delivery
             deliverToNearestCamp(data.camp_id);
         } else {
             showToast(data.message || 'No active camps found. Please register with an NGO first.', 'error');
@@ -1054,9 +946,6 @@ function proceedToDelivery() {
     });
 }
 
-/**
- * Deliver to a specific camp via AJAX
- */
 function deliverToNearestCamp(campId) {
     const csrftoken = getCookie('csrftoken');
     const deliverBtn = document.getElementById('deliver-btn');
@@ -1077,8 +966,6 @@ function deliverToNearestCamp(campId) {
     .then(data => {
         if (data.success) {
             showToast(data.message || 'Delivered successfully!', 'success');
-            
-            // Redirect to deliveries page after a short delay
             setTimeout(() => {
                 window.location.href = "/dashboard/volunteer/deliveries/";
             }, 1500);
