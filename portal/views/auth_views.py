@@ -338,3 +338,30 @@ def delete_account(request):
         return JsonResponse({'success': True, 'message': 'Account deleted successfully'})
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
+    
+@login_required
+def change_password(request):
+    """Allow logged-in users to change their password voluntarily from settings."""
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password')
+        new_password2 = request.POST.get('new_password2')
+        
+        if new_password != new_password2:
+            messages.error(request, 'Passwords do not match.')
+            return redirect(request.META.get('HTTP_REFERER', 'index'))
+        
+        if len(new_password) < 8:
+            messages.error(request, 'Password must be at least 8 characters long.')
+            return redirect(request.META.get('HTTP_REFERER', 'index'))
+        
+        # Set new password
+        request.user.set_password(new_password)
+        request.user.save()
+        
+        # Re-authenticate the user so they aren't logged out
+        login(request, request.user, backend='django.contrib.auth.backends.ModelBackend')
+        
+        messages.success(request, 'Password changed successfully!')
+        return redirect(request.META.get('HTTP_REFERER', 'index'))
+    
+    return redirect('index')

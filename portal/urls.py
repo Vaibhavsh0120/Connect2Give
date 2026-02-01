@@ -49,6 +49,7 @@ urlpatterns = [
     path('account/unlink-google/', views.unlink_google_account, name='unlink_google_account'),
     path('account/set-password/', views.set_password_after_google, name='set_password_after_google'),
     path('account/delete/', views.delete_account, name='delete_account'),
+    path('account/change-password/', views.change_password, name='change_password'),
     
     # --- Restaurant Dashboard URLs ---
     path('dashboard/restaurant/', views.restaurant_dashboard, name='restaurant_dashboard'),
