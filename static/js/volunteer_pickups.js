@@ -445,7 +445,7 @@ function acceptDonation(donationId) {
             
             showToast(data.message || 'Donation accepted! Please pick it up within 30 minutes.', 'success');
             
-            // NO RELOAD: Smoothly remove from available list
+            // NO RELOAD: Smoothly remove from available list and add to active list
             setTimeout(() => {
                 const row = document.getElementById(`donation-row-${donationId}`);
                 if (row) {
@@ -456,14 +456,26 @@ function acceptDonation(donationId) {
                         row.remove();
                         console.log('[v0] Donation removed from available list');
                         
+                        // NEW: Immediately add to active list if data returned from server
+                        if (data.donation) {
+                            addPickupCardToActiveList(data.donation);
+                            // Refresh map logic to include new point
+                            setTimeout(() => {
+                                initializePickupMode();
+                            }, 500);
+                        } else {
+                            // Fallback if backend doesn't send data yet (should not happen with updated view)
+                            setTimeout(() => {
+                                initializePickupMode();
+                            }, 300);
+                        }
+                        
                         // Check if available donations list is empty
                         const availableList = document.getElementById('available-donations-tbody');
                         if (availableList) {
                             const remainingDonations = availableList.querySelectorAll('tr[id^="donation-row-"]');
                             if (remainingDonations.length === 0) {
                                 console.log('[v0] No more available donations');
-                                // Replace table with empty state if needed, or just reload if simpler
-                                // But for now we just leave the empty table header or a message
                                 const container = document.getElementById('available-donations-container');
                                 if (container) {
                                     container.innerHTML = '<p class="empty-state">There are no available donations right now. Check back later.</p>';
@@ -487,6 +499,65 @@ function acceptDonation(donationId) {
         acceptBtn.style.cursor = 'pointer';
         showToast('An error occurred. Please try again.', 'error');
     });
+}
+
+/**
+ * Helper: Add a new pickup card to the active list dynamically
+ */
+function addPickupCardToActiveList(donation) {
+    const list = document.getElementById('pickup-list');
+    
+    // If list doesn't exist (e.g., page loaded with 0 pickups and rendered the "No Active Pickups" empty state),
+    // we must reload because the HTML structure for the map and list isn't there.
+    if (!list) {
+        console.log('[v0] Pickup list container not found, reloading to render active state...');
+        window.location.reload();
+        return;
+    }
+
+    // Check if already exists to prevent duplicates
+    if (document.getElementById(`pickup-card-${donation.pk}`)) return;
+
+    const card = document.createElement('div');
+    card.className = 'pickup-item-card';
+    card.id = `pickup-card-${donation.pk}`;
+    card.setAttribute('data-donation-id', donation.pk);
+    card.setAttribute('data-status', 'accepted');
+    card.setAttribute('data-lat', donation.latitude);
+    card.setAttribute('data-lon', donation.longitude);
+    
+    card.innerHTML = `
+        <div style="display: flex; align-items: center; flex: 1;">
+            <span class="pickup-order-badge" id="order-badge-${donation.pk}" style="display: none;">-</span>
+            <div class="pickup-item-info" style="flex: 1;">
+                <h4>${donation.restaurant_name}</h4>
+                <p>${donation.food_description}</p>
+                <p class="address-text">${donation.pickup_address}</p>
+            </div>
+        </div>
+        <div class="pickup-item-status" style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn-collect" id="collect-btn-${donation.pk}" onclick="markAsCollected(${donation.pk})">
+                Mark as Collected
+            </button>
+            <button class="btn-cancel" id="cancel-btn-${donation.pk}" onclick="cancelPickup(${donation.pk})" title="Cancel this pickup">
+                Cancel
+            </button>
+        </div>
+    `;
+    
+    list.appendChild(card);
+    
+    // Update active count in stats bar
+    const activeCountEl = document.getElementById('active-count');
+    if (activeCountEl) {
+         const parts = activeCountEl.textContent.split('/');
+         let current = parseInt(parts[0]) || 0;
+         activeCountEl.textContent = `${current + 1}/10`;
+    }
+    
+    // Ensure map container is visible
+    const mapContainer = document.getElementById('pickup-map-container');
+    if (mapContainer) mapContainer.style.display = 'block';
 }
 
 /**

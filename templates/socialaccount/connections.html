@@ -7,7 +7,16 @@
 {% block content %}
 <div class="connections-wrapper">
     <div class="header-actions">
-        <a href="javascript:history.back()" class="btn-back">
+        {# FIXED: Dynamic back link based on user type to avoid OAuth redirect loops #}
+        {% if user.user_type == 'VOLUNTEER' %}
+            <a href="{% url 'volunteer_settings' %}" class="btn-back">
+        {% elif user.user_type == 'NGO' %}
+            <a href="{% url 'ngo_settings' %}" class="btn-back">
+        {% elif user.user_type == 'RESTAURANT' %}
+            <a href="{% url 'restaurant_settings' %}" class="btn-back">
+        {% else %}
+            <a href="{% url 'index' %}" class="btn-back">
+        {% endif %}
             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             <span>Back to Settings</span>
         </a>

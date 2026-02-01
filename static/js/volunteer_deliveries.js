@@ -61,6 +61,54 @@ document.addEventListener('DOMContentLoaded', function () {
     startLiveLocationTracking();
 });
 
+// ============ ACTIONS ============
+
+/**
+ * Handle delivery confirmation via AJAX to avoid black JSON page
+ */
+window.confirmDelivery = function(campId) {
+    if (!confirm('Are you sure you want to mark these items as delivered?')) {
+        return;
+    }
+
+    const btn = document.querySelector('button[data-testid="confirm-delivery-btn"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Processing...';
+    }
+
+    const csrftoken = getCookie('csrftoken');
+
+    fetch(`/donation/deliver/to/${campId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Redirect to history tab to show the pending verifications
+            window.location.href = '/dashboard/volunteer/deliveries/?tab=history';
+        } else {
+            alert(data.message || 'Error processing delivery.');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Confirm & Mark All as Delivered';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An unexpected error occurred.');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Confirm & Mark All as Delivered';
+        }
+    });
+};
+
 // ============ DELIVERY MAP INITIALIZATION ============
 
 /**
@@ -189,7 +237,6 @@ function initializeDeliveryMap() {
  */
 function updateDeliveryRouteSummary(distance, time, campData) {
     const deliveryInfo = document.getElementById('delivery-info');
-    const csrftoken = getCookie('csrftoken');
     
     if (!deliveryInfo) return;
     
@@ -200,12 +247,11 @@ function updateDeliveryRouteSummary(distance, time, campData) {
                 <p><strong>Estimated Time:</strong> ${time} minutes</p>
                 <p><strong>Destination:</strong> <strong>${campData.name}</strong> (${campData.ngo_name})</p>
             </div>
-            <form action="/donation/deliver/to/${campData.pk}/" method="POST" style="margin: 0;">
-                <input type="hidden" name="csrfmiddlewaretoken" value="${csrftoken}">
-                <button type="submit" class="btn-primary-action" data-testid="confirm-delivery-btn">
+            <div>
+                <button type="button" class="btn-primary-action" data-testid="confirm-delivery-btn" onclick="confirmDelivery(${campData.pk})">
                     Confirm & Mark All as Delivered
                 </button>
-            </form>
+            </div>
         </div>
     `;
 }
@@ -215,7 +261,6 @@ function updateDeliveryRouteSummary(distance, time, campData) {
  */
 function updateDeliveryRouteSummaryFallback(campData) {
     const deliveryInfo = document.getElementById('delivery-info');
-    const csrftoken = getCookie('csrftoken');
     
     if (!deliveryInfo) return;
     
@@ -225,12 +270,11 @@ function updateDeliveryRouteSummaryFallback(campData) {
                 <p><strong>Destination:</strong> <strong>${campData.name}</strong> (${campData.ngo_name})</p>
                 <p><small>Location services unavailable. Map is showing your route.</small></p>
             </div>
-            <form action="/donation/deliver/to/${campData.pk}/" method="POST" style="margin: 0;">
-                <input type="hidden" name="csrfmiddlewaretoken" value="${csrftoken}">
-                <button type="submit" class="btn-primary-action" data-testid="confirm-delivery-btn">
+            <div>
+                <button type="button" class="btn-primary-action" data-testid="confirm-delivery-btn" onclick="confirmDelivery(${campData.pk})">
                     Confirm & Mark All as Delivered
                 </button>
-            </form>
+            </div>
         </div>
     `;
 }

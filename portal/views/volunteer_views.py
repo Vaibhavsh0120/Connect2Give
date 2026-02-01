@@ -303,7 +303,22 @@ def accept_donation(request, donation_id):
             donation.accepted_at = timezone.now()
             donation.save()
             
-            return JsonResponse({'success': True, 'message': 'Donation accepted! Please check your active pickups.'})
+            # Prepare donation details for frontend dynamic update
+            donation_data = {
+                'pk': donation.pk,
+                'restaurant_name': donation.restaurant.restaurant_name,
+                'food_description': donation.food_description,
+                'pickup_address': donation.pickup_address,
+                'latitude': donation.restaurant.latitude,
+                'longitude': donation.restaurant.longitude,
+                'status': 'accepted'
+            }
+            
+            return JsonResponse({
+                'success': True, 
+                'message': 'Donation accepted! Please check your active pickups.',
+                'donation': donation_data
+            })
             
     except Donation.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'Donation not found.'}, status=404)
