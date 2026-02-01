@@ -324,3 +324,17 @@ def set_password_after_google(request):
     
     messages.error(request, 'Invalid request')
     return redirect('volunteer_settings')
+
+@login_required
+@require_http_methods(["POST"])
+def delete_account(request):
+    """Permanently delete the user account."""
+    try:
+        user = request.user
+        # Log the user out before deleting to avoid session issues
+        logout(request)
+        # Delete the user (this should cascade to profiles like NGOProfile/RestaurantProfile)
+        user.delete()
+        return JsonResponse({'success': True, 'message': 'Account deleted successfully'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)

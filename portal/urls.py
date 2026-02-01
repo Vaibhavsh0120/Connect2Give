@@ -48,6 +48,7 @@ urlpatterns = [
     path('account/link-google/', views.link_google_account, name='link_google_account'),
     path('account/unlink-google/', views.unlink_google_account, name='unlink_google_account'),
     path('account/set-password/', views.set_password_after_google, name='set_password_after_google'),
+    path('account/delete/', views.delete_account, name='delete_account'),
     
     # --- Restaurant Dashboard URLs ---
     path('dashboard/restaurant/', views.restaurant_dashboard, name='restaurant_dashboard'),
@@ -111,7 +112,4 @@ urlpatterns = [
     path('dashboard/ngo/volunteer-locations/', tracking_views.ngo_volunteer_locations, name='ngo_volunteer_locations'),
     path('api/get-volunteers-locations/', tracking_views.get_volunteers_locations_api, name='get_volunteers_locations_api'),
     path('volunteer/location-privacy/', tracking_views.volunteer_location_privacy_settings, name='volunteer_location_privacy'),
-    
-    # --- Verification Protocol URLs ---
-    # NOTE: Trust score URLs removed - now integrated into verification flow
 ]
