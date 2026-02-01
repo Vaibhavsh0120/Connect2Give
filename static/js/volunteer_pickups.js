@@ -207,7 +207,7 @@ function calculateOptimizedRoute() {
     .then(data => {
         if (data.success) {
             displayPickupRoute(data);
-            showToast('Optimal route calculated!', 'success');
+            // showToast('Optimal route calculated!', 'success'); // Toast removed as requested
         } else {
             // Silently fail if just no routes (e.g. after cancellation)
         }

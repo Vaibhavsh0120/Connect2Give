@@ -541,10 +541,10 @@ def calculate_pickup_route(request):
             name='Your Location'
         )
         
-        # Get active accepted/collected donations
+        # Get active accepted donations only (exclude collected ones from pickup route)
         active_donations = Donation.objects.filter(
             assigned_volunteer=volunteer_profile,
-            status__in=['ACCEPTED', 'COLLECTED']
+            status='ACCEPTED'  # CHANGED: Only route to items needing pickup
         ).select_related('restaurant')
         
         if not active_donations.exists():
