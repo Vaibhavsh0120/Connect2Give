@@ -263,6 +263,20 @@
     .btn-secondary-action:hover {
         background: #e5e7eb;
     }
+
+    /* Status Badge */
+    .status-badge {
+        display: inline-block;
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .status-collected {
+        background: #d1fae5;
+        color: #065f46;
+    }
 </style>
 
 {# Stats Bar #}
@@ -282,6 +296,21 @@
 <div class="content-card">
     <h3 style="margin: 0 0 1rem 0;">My Active Pickups</h3>
 
+    {# TSP Map - Always shown when there are active pickups #}
+    <div class="pickup-map-container" id="pickup-map-container">
+        <div id="pickup-route-map"></div>
+        <div class="map-legend">
+            <div class="map-legend-item">
+                <div class="legend-marker" style="background: #10b981;"></div>
+                <span>Your Location</span>
+            </div>
+            <div class="map-legend-item">
+                <div class="legend-marker" style="background: #3b82f6;"></div>
+                <span>Restaurant Pickup</span>
+            </div>
+        </div>
+    </div>
+
     {# Route Info Banner (shown when map is active) #}
     <div class="route-info-banner" id="route-info-banner" style="display: none;">
         <div class="route-details">
@@ -300,54 +329,46 @@
         </div>
     </div>
 
-    {# Route Map (shown immediately when there are pickups) #}
-    <div class="pickup-map-container" id="pickup-map-container" style="display: none;">
-        <div id="pickup-route-map"></div>
-        <div class="map-legend">
-            <div class="map-legend-item">
-                <div class="legend-marker" style="background: #10b981;"></div>
-                <span>Your Location</span>
-            </div>
-            <div class="map-legend-item">
-                <div class="legend-marker" style="background: #3b82f6;"></div>
-                <span>Restaurant Pickup</span>
-            </div>
-        </div>
-    </div>
-
     <div class="pickup-list-modern" id="pickup-list">
         {% for donation in active_donations %}
-        <div class="pickup-item-card" id="pickup-card-{{ donation.pk }}" data-donation-id="{{ donation.pk }}"
+        <div class="pickup-item-card" id="pickup-card-{{ donation.pk }}" data-donation-id="{{ donation.pk }}" data-status="{{ donation.status|lower }}"
              data-lat="{{ donation.restaurant.latitude }}" data-lon="{{ donation.restaurant.longitude }}">
-            <div style="display: flex; align-items: center;">
+            <div style="display: flex; align-items: center; flex: 1;">
                 <span class="pickup-order-badge" id="order-badge-{{ donation.pk }}" style="display: none;">-</span>
-                <div class="pickup-item-info">
+                <div class="pickup-item-info" style="flex: 1;">
                     <h4>{{ donation.restaurant.restaurant_name }}</h4>
                     <p>{{ donation.food_description }}</p>
                     <p class="address-text">{{ donation.pickup_address }}</p>
                 </div>
             </div>
             <div class="pickup-item-status" style="display: flex; gap: 8px; align-items: center;">
-                <button class="btn-collect" id="collect-btn-{{ donation.pk }}" onclick="markAsCollected({{ donation.pk }})">
-                    Mark as Collected
-                </button>
-                <button class="btn-cancel" id="cancel-btn-{{ donation.pk }}" onclick="cancelPickup({{ donation.pk }})" title="Cancel this pickup">
-                    Cancel
-                </button>
+                {% if donation.status == 'ACCEPTED' %}
+                    <button class="btn-collect" id="collect-btn-{{ donation.pk }}" onclick="markAsCollected({{ donation.pk }})">
+                        Mark as Collected
+                    </button>
+                    <button class="btn-cancel" id="cancel-btn-{{ donation.pk }}" onclick="cancelPickup({{ donation.pk }})" title="Cancel this pickup">
+                        Cancel
+                    </button>
+                {% elif donation.status == 'COLLECTED' %}
+                    <span class="status-badge status-collected">Collected</span>
+                    <button class="btn-cancel" id="cancel-btn-{{ donation.pk }}" onclick="cancelPickup({{ donation.pk }})" title="Cancel this pickup">
+                        Cancel
+                    </button>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
     </div>
 
-    {# Proceed to Delivery Button - Only show if all active are COLLECTED #}
+    {# Deliver to Camp Button - Only show if ALL items are COLLECTED #}
     <div id="delivery-button-container" style="display: none; margin-top: 1.5rem; text-align: center;">
-        <a href="{% url 'volunteer_deliveries' %}" class="btn-primary-action">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button class="btn-primary-action" id="deliver-btn" onclick="proceedToDelivery()" style="font-size: 1.1rem; padding: 14px 32px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M5 12h14"/>
                 <path d="m12 5 7 7-7 7"/>
             </svg>
-            Proceed to Delivery
-        </a>
+            Deliver to Camp
+        </button>
     </div>
 </div>
 {% else %}
@@ -417,5 +438,24 @@
 {{ block.super }}
 {% load static %}
 <script src="{% static 'js/common.js' %}"></script>
+
+{# Pass active pickups data to JavaScript #}
+{% if active_donations %}
+    {% for donation in active_donations %}
+        <div id="donation-{{ donation.pk }}-data" 
+             data-donation-id="{{ donation.pk }}" 
+             data-status="{{ donation.status|lower }}" 
+             data-lat="{{ donation.restaurant.latitude }}" 
+             data-lon="{{ donation.restaurant.longitude }}"
+             style="display: none;"></div>
+    {% endfor %}
+{% endif %}
+
 <script src="{% static 'js/volunteer_pickups.js' %}"></script>
+<script>
+// Deliver to Camp handler
+function proceedToDelivery() {
+    window.location.href = "{% url 'volunteer_deliveries' %}";
+}
+</script>
 {% endblock scripts %}

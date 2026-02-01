@@ -69,7 +69,6 @@ urlpatterns = [
     path('dashboard/volunteer/pickups/', views.volunteer_pickups, name='volunteer_pickups'),
     path('dashboard/volunteer/deliveries/', views.volunteer_deliveries, name='volunteer_deliveries'),
     path('dashboard/volunteer/manage-pickups/', views.volunteer_manage_pickups, name='volunteer_manage_pickups'),  # Legacy redirect
-    path('dashboard/volunteer/camps/', views.volunteer_manage_camps, name='volunteer_manage_camps'),
     path('dashboard/volunteer/profile/', views.volunteer_profile, name='volunteer_profile'),
     path('dashboard/volunteer/settings/', views.volunteer_settings, name='volunteer_settings'),
     
