@@ -7,7 +7,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
-from django.db import transaction
+from django.db import transaction, IntegrityError
 import secrets
 import string
 import socket  # Imported to help catch network errors
@@ -206,6 +206,9 @@ def ngo_register_volunteer(request):
                     error_popup = "Email Login Failed: The system could not log in to the email account. Check the 'EMAIL_HOST_PASSWORD' in your settings."
                 elif "gaierror" in error_str or "Temporary failure" in error_str:
                     error_popup = "DNS Error: Could not find the email server. Please check your internet connection."
+                elif "Duplicate entry" in error_str:
+                    # Catch-all for database integrity errors that slipped past the form
+                    error_popup = "Registration Failed: A volunteer with this information (Email, Username, or Aadhar) already exists."
                 else:
                     # Fallback for other errors
                     error_popup = f"Registration Failed: {error_str}"

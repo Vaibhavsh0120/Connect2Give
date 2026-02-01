@@ -115,6 +115,34 @@ def register_step_2(request):
         
         if username_error:
             return render(request, 'auth/register_step_2.html', {'error': username_error})
+            
+        # --- NEW VALIDATION: Check if Profile Details Already Exist ---
+        profile_error = None
+        
+        if user_type == User.UserType.NGO:
+            registration_number = request.POST.get('registration_number')
+            if NGOProfile.objects.filter(registration_number=registration_number).exists():
+                profile_error = 'This Registration Number is already registered with another NGO.'
+            
+            # Validate contact number
+            contact_number = request.POST.get('contact_number', '').strip()
+            if not contact_number.isdigit() or len(contact_number) != 10:
+                profile_error = 'Contact number must be exactly 10 digits.'
+                
+        elif user_type == User.UserType.RESTAURANT:
+            # Check if restaurant phone number is already taken
+            phone_number = request.POST.get('restaurant_phone_number')
+            if RestaurantProfile.objects.filter(phone_number=phone_number).exists():
+                profile_error = 'This phone number is already registered with another restaurant.'
+
+        if profile_error:
+            # Pass user context back if authenticated so they don't lose session info
+            context = {'error': profile_error}
+            if request.user.is_authenticated:
+                context['user'] = request.user
+                context['prefill_username'] = request.user.username or request.user.first_name or ''
+            return render(request, 'auth/register_step_2.html', context)
+        # -------------------------------------------------------------
         
         user = None
         if registration_data: # Manual registration flow
@@ -151,18 +179,13 @@ def register_step_2(request):
                     longitude=longitude
                 )
             elif user_type == User.UserType.NGO:
-                # Validate contact_number is 10 digits
-                contact_number = request.POST.get('contact_number', '').strip()
-                if not contact_number.isdigit() or len(contact_number) != 10:
-                    messages.error(request, 'Contact number must be exactly 10 digits.')
-                    return render(request, 'auth/register_step_2.html', {'error': 'Invalid contact number.'})
-                
+                # Validation performed above, safe to create
                 NGOProfile.objects.create(
                     user=user,
                     ngo_name=request.POST.get('ngo_name'),
                     registration_number=request.POST.get('registration_number'),
                     address=address,
-                    contact_number=contact_number,
+                    contact_number=request.POST.get('contact_number', '').strip(),
                     latitude=latitude,
                     longitude=longitude
                 )
