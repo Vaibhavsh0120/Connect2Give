@@ -277,15 +277,19 @@ def unlink_google_account(request):
         
         # Try to remove Google social auth entry
         try:
-            from social_django.models import UserSocialAuth
-            social_auth = UserSocialAuth.objects.get(user=user, provider='google-oauth2')
+            from allauth.socialaccount.models import SocialAccount
+            social_auth = SocialAccount.objects.get(user=user, provider='google')
             social_auth.delete()
-            messages.success(request, 'Google account successfully unlinked.')
             return JsonResponse({'success': True, 'message': 'Google account unlinked'})
-        except:
+        except SocialAccount.DoesNotExist:
             return JsonResponse({
                 'success': False, 
                 'message': 'Google account is not linked'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'success': False, 
+                'message': str(e)
             }, status=400)
     
     except Exception as e:

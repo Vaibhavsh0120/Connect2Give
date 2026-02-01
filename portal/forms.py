@@ -327,4 +327,4 @@ class NGORegisterVolunteerForm(forms.Form):
             'packaging': 'Packaging',
         }
         readable_skills = [skill_map.get(s, s) for s in skills if s]
-        return ', '.join(readable_skills)
+        return ', '.join(str(skill) for skill in readable_skills)

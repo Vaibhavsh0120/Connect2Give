@@ -12,7 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from ..models import Donation, DonationCamp, NGOProfile, VolunteerProfile, VolunteerTrustScore
+from ..models import Donation, DonationCamp, NGOProfile, VolunteerProfile
 from ..decorators import user_type_required
 
 
@@ -66,8 +66,8 @@ def verify_and_approve_donation(request, donation_id):
         donation = get_object_or_404(Donation, pk=donation_id)
         ngo_profile = request.user.ngo_profile
         
-        # Verify the donation belongs to this NGO's camp
-        if donation.target_camp.ngo != ngo_profile:
+        # Verify the donation has a target camp and belongs to this NGO's camp
+        if not donation.target_camp or donation.target_camp.ngo != ngo_profile:
             return JsonResponse({
                 'success': False,
                 'message': 'Unauthorized - this donation is not assigned to your camp'
@@ -88,27 +88,10 @@ def verify_and_approve_donation(request, donation_id):
             donation.is_verified = True
             donation.save()
             
-            # Update volunteer trust score
+            # Log verified delivery
             if donation.assigned_volunteer:
                 volunteer = donation.assigned_volunteer
-                
-                # Get or create trust score
-                trust_score, created = VolunteerTrustScore.objects.get_or_create(volunteer=volunteer)
-                
-                # Update metrics
-                trust_score.total_deliveries += 1
-                trust_score.verified_deliveries += 1
-                
-                # Update average rating if present
-                if donation.rating:
-                    old_avg = trust_score.average_rating
-                    total_rated = trust_score.total_deliveries - 1
-                    trust_score.average_rating = (old_avg * total_rated + donation.rating) / trust_score.total_deliveries
-                
-                # Recalculate trust score
-                trust_score.update_trust_score()
-                
-                print(f"[v0] Verified delivery for {volunteer.full_name}. Trust Score: {trust_score.trust_score:.1f}")
+                print(f"[v0] Verified delivery from {volunteer.full_name} for {donation.restaurant.restaurant_name}")
             
             return JsonResponse({
                 'success': True,
@@ -137,8 +120,8 @@ def reject_donation_verification(request, donation_id):
         ngo_profile = request.user.ngo_profile
         rejection_reason = request.POST.get('reason', 'Quality issues')
         
-        # Verify the donation belongs to this NGO's camp
-        if donation.target_camp.ngo != ngo_profile:
+        # Verify the donation has a target camp and belongs to this NGO's camp
+        if not donation.target_camp or donation.target_camp.ngo != ngo_profile:
             return JsonResponse({
                 'success': False,
                 'message': 'Unauthorized'
@@ -158,18 +141,10 @@ def reject_donation_verification(request, donation_id):
             donation.verification_count += 1
             donation.save()
             
-            # Update volunteer trust score for rejection
+            # Log rejected delivery
             if donation.assigned_volunteer:
                 volunteer = donation.assigned_volunteer
-                trust_score, created = VolunteerTrustScore.objects.get_or_create(volunteer=volunteer)
-                
-                trust_score.total_deliveries += 1
-                trust_score.rejected_deliveries += 1
-                
-                # Recalculate trust score (penalty applied in update method)
-                trust_score.update_trust_score()
-                
-                print(f"[v0] Donation {donation.id} rejected: {rejection_reason}. {volunteer.full_name}'s Trust Score: {trust_score.trust_score:.1f}")
+                print(f"[v0] Donation rejected from {volunteer.full_name}: {rejection_reason}")
             
             return JsonResponse({
                 'success': True,
@@ -194,8 +169,8 @@ def donation_verification_detail(request, donation_id):
     donation = get_object_or_404(Donation, pk=donation_id)
     ngo_profile = request.user.ngo_profile
     
-    # Verify access
-    if donation.target_camp.ngo != ngo_profile:
+    # Verify access - check if target_camp exists
+    if not donation.target_camp or donation.target_camp.ngo != ngo_profile:
         messages.error(request, 'Unauthorized access')
         return redirect('ngo_dashboard_overview')
     

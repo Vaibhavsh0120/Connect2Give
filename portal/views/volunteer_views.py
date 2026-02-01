@@ -763,6 +763,13 @@ def get_nearest_camp(request):
         # For now, return the first active camp (nearest will be calculated on map in deliveries view)
         nearest_camp = active_camps.first()
         
+        if not nearest_camp:
+            return JsonResponse({
+                'success': False,
+                'message': 'No active camps found.',
+                'camp_id': None
+            }, status=400)
+        
         return JsonResponse({
             'success': True,
             'camp_id': nearest_camp.pk,

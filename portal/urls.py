@@ -2,7 +2,7 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
-from .views import verification_views, tracking_views, trust_score_views
+from .views import verification_views, tracking_views
 
 urlpatterns = [
     # --- Service Worker URL ---
@@ -112,9 +112,6 @@ urlpatterns = [
     path('api/get-volunteers-locations/', tracking_views.get_volunteers_locations_api, name='get_volunteers_locations_api'),
     path('volunteer/location-privacy/', tracking_views.volunteer_location_privacy_settings, name='volunteer_location_privacy'),
     
-    # --- Trust Score & Verification Protocol URLs ---
-    path('dashboard/volunteer/trust-score/', trust_score_views.volunteer_trust_dashboard, name='volunteer_trust_dashboard'),
-    path('api/volunteer-verification-stats/', trust_score_views.volunteer_verification_stats, name='volunteer_verification_stats'),
-    path('dashboard/ngo/volunteer-trust-profiles/', trust_score_views.ngo_volunteer_trust_profiles, name='ngo_volunteer_trust_profiles'),
-    path('dashboard/ngo/verification-analytics/', trust_score_views.donation_verification_analytics, name='donation_verification_analytics'),
+    # --- Verification Protocol URLs ---
+    # NOTE: Trust score URLs removed - now integrated into verification flow
 ]

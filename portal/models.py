@@ -107,48 +107,6 @@ class DonationCamp(models.Model):
     def __str__(self):
         return f"{self.name} by {self.ngo.ngo_name}"
 
-class VolunteerTrustScore(models.Model):
-    """
-    Tracks volunteer's trust score and verification history
-    """
-    volunteer = models.OneToOneField(VolunteerProfile, on_delete=models.CASCADE, related_name='trust_score')
-    total_deliveries = models.IntegerField(default=0)
-    verified_deliveries = models.IntegerField(default=0)
-    rejected_deliveries = models.IntegerField(default=0)
-    average_rating = models.FloatField(default=0.0)
-    trust_score = models.FloatField(default=100.0, help_text="0-100 score, starts at 100")
-    badges = models.JSONField(default=list, help_text="List of earned badges: ['verified', 'trusted', 'reliable', 'excellent']")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"Trust Score for {self.volunteer.full_name}: {self.trust_score:.1f}"
-    
-    def update_trust_score(self):
-        """Calculate trust score based on delivery history"""
-        if self.total_deliveries == 0:
-            self.trust_score = 100.0
-            return
-        
-        verification_rate = (self.verified_deliveries / self.total_deliveries) * 100
-        rejection_penalty = (self.rejected_deliveries * 5)
-        rating_bonus = (self.average_rating / 5) * 20
-        
-        self.trust_score = max(0, min(100, 50 + verification_rate - rejection_penalty + rating_bonus))
-        
-        # Award badges
-        self.badges = []
-        if self.verified_deliveries >= 1:
-            self.badges.append('verified')
-        if self.trust_score >= 80:
-            self.badges.append('trusted')
-        if self.trust_score >= 90 and self.total_deliveries >= 10:
-            self.badges.append('reliable')
-        if self.average_rating >= 4.5 and self.total_deliveries >= 20:
-            self.badges.append('excellent')
-        
-        self.save()
-
 
 class Donation(models.Model):
     class DonationStatus(models.TextChoices):
