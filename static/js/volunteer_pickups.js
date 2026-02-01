@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Start live location tracking
     startLiveLocationTracking();
     
-    // Auto-calculate and display route if there are active pickups
+    // Auto-calculate and display TSP route if there are active pickups
     const pickupList = document.getElementById('pickup-list');
     const pickupCards = pickupList ? pickupList.querySelectorAll('[data-donation-id]') : [];
     
@@ -89,9 +89,49 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log('[v0] Active pickups found:', pickupCards.length);
         // Auto-trigger route calculation after a short delay to ensure DOM is ready
         setTimeout(() => {
-            calculateOptimizedRoute();
+            // Fetch the route from backend
+            fetch('/api/calculate-pickup-route/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayPickupRoute(data);
+                    console.log('[v0] TSP route auto-initialized');
+                } else {
+                    console.warn('[v0] Failed to auto-initialize route:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('[v0] Error auto-initializing route:', error);
+            });
         }, 500);
     }
+    
+    // Check if all pickups are already collected (on page load)
+    setTimeout(() => {
+        if (pickupCards.length > 0) {
+            const allCollected = Array.from(pickupCards).every(card => 
+                card.getAttribute('data-status') === 'collected'
+            );
+            if (allCollected) {
+                console.log('[v0] All items already collected on page load');
+                const deliveryBtn = document.getElementById('delivery-button-container');
+                if (deliveryBtn) {
+                    deliveryBtn.style.display = 'block';
+                    const mapContainer = document.getElementById('pickup-map-container');
+                    const infoBanner = document.getElementById('route-info-banner');
+                    if (mapContainer) mapContainer.style.display = 'none';
+                    if (infoBanner) infoBanner.style.display = 'none';
+                }
+            }
+        }
+    }, 1000);
 });
 
 // ============ PICKUP MAP (Mode A - Multi-stop TSP) ============
@@ -439,7 +479,7 @@ function acceptDonation(donationId) {
 
 /**
  * Mark a donation as collected via AJAX
- * FIXED: Updates DOM immediately, checks if all collected, shows delivery button
+ * FIXED: Keeps item in list, shows "Collected" badge, checks if ALL collected, shows delivery button
  * @param {number} donationId - ID of the donation to mark as collected
  */
 function markAsCollected(donationId) {
@@ -465,16 +505,19 @@ function markAsCollected(donationId) {
         if (data.success) {
             showToast(data.message || 'Marked as collected!', 'success');
             
-            // FIXED: Update button to show "Collected" status
-            collectBtn.textContent = 'Collected ✓';
-            collectBtn.style.backgroundColor = '#10b981';
-            collectBtn.style.cursor = 'default';
-            collectBtn.disabled = true;
+            // PERSISTENT: Keep item in list, replace button with "Collected" badge
+            const statusDiv = collectBtn.parentElement;
+            collectBtn.style.display = 'none'; // Hide the button
             
-            // Disable cancel button for collected items
-            if (cancelBtn) {
-                cancelBtn.disabled = true;
-                cancelBtn.style.opacity = '0.5';
+            // Create and show collected badge
+            const badge = document.createElement('span');
+            badge.className = 'status-badge status-collected';
+            badge.textContent = 'Collected';
+            statusDiv.insertBefore(badge, collectBtn);
+            
+            // Update the card's data-status attribute
+            if (pickupCard) {
+                pickupCard.setAttribute('data-status', 'collected');
             }
             
             // Update collected count
@@ -484,12 +527,11 @@ function markAsCollected(donationId) {
                 collectedCountEl.textContent = currentCount + 1;
             }
             
-            // FIXED: Check if ALL pickups are collected
+            // PERSISTENT: Check if ALL pickups are collected
             setTimeout(() => {
                 const allPickups = document.querySelectorAll('#pickup-list [data-donation-id]');
                 const allCollected = Array.from(allPickups).every(card => {
-                    const btn = card.querySelector('[id^="collect-btn-"]');
-                    return btn && btn.textContent.includes('✓');
+                    return card.getAttribute('data-status') === 'collected';
                 });
                 
                 console.log('[v0] All collected?', allCollected, '- Total pickups:', allPickups.length);
