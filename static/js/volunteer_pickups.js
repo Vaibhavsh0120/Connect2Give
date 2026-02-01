@@ -364,6 +364,7 @@ function sendLocationUpdate(latitude, longitude, accuracy) {
 
 /**
  * Accept a donation via AJAX
+ * NO RELOAD: DOM updated async, item moved from available to active pickups
  * @param {number} donationId - ID of the donation to accept
  */
 function acceptDonation(donationId) {
@@ -397,16 +398,29 @@ function acceptDonation(donationId) {
             
             showToast(data.message || 'Donation accepted! Please pick it up within 30 minutes.', 'success');
             
+            // NO RELOAD: Smoothly remove from available list
             setTimeout(() => {
                 const row = document.getElementById(`donation-row-${donationId}`);
                 if (row) {
-                    row.style.transition = 'opacity 0.3s ease-out';
+                    row.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
                     row.style.opacity = '0';
-                    setTimeout(() => row.remove(), 300);
+                    row.style.transform = 'translateX(-20px)';
+                    setTimeout(() => {
+                        row.remove();
+                        console.log('[v0] Donation removed from available list');
+                        
+                        // Check if available donations list is empty
+                        const availableList = document.getElementById('available-list');
+                        if (availableList) {
+                            const remainingDonations = availableList.querySelectorAll('[data-donation-id]');
+                            if (remainingDonations.length === 0) {
+                                console.log('[v0] No more available donations');
+                                availableList.innerHTML = '<div style="text-align: center; padding: 2rem; color: #9ca3af;">No donations available at this time.</div>';
+                            }
+                        }
+                    }, 300);
                 }
-                // Reload to update active pickups
-                setTimeout(() => location.reload(), 500);
-            }, 1000);
+            }, 500);
         } else {
             acceptBtn.disabled = false;
             acceptBtn.textContent = 'Accept';
@@ -599,6 +613,7 @@ function cancelPickup(donationId) {
 
 /**
  * Register with an NGO via AJAX
+ * NO RELOAD: DOM updated async, item moved from available to registered
  * @param {number} ngoId - ID of the NGO to register with
  */
 function registerWithNGO(ngoId) {
@@ -621,7 +636,49 @@ function registerWithNGO(ngoId) {
     .then(data => {
         if (data.success) {
             showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 1500);
+            
+            // NO RELOAD: Remove from available, add to registered
+            setTimeout(() => {
+                const availableRow = document.getElementById(`available-ngo-${ngoId}`);
+                if (availableRow) {
+                    availableRow.style.transition = 'opacity 0.3s ease-out';
+                    availableRow.style.opacity = '0';
+                    setTimeout(() => {
+                        availableRow.remove();
+                        
+                        // Check if available list is empty
+                        const availableList = document.getElementById('available-ngos-tbody');
+                        if (availableList && availableList.querySelectorAll('tr:not(:has(.empty-state))').length === 0) {
+                            availableList.innerHTML = '<tr><td colspan="3"><div class="empty-state"><p>No New NGOs Available</p></div></td></tr>';
+                        }
+                    }, 300);
+                }
+                
+                // Remove empty row if exists in registered list
+                const registeredEmpty = document.getElementById('registered-empty');
+                if (registeredEmpty) {
+                    registeredEmpty.remove();
+                }
+                
+                // Add to registered list (requires data from API response)
+                if (data.ngo_name) {
+                    const registeredList = document.getElementById('registered-ngos-tbody');
+                    if (registeredList) {
+                        const newRow = document.createElement('tr');
+                        newRow.id = `registered-ngo-${ngoId}`;
+                        const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                        newRow.innerHTML = `
+                            <td data-label="NGO Name"><strong>${data.ngo_name}</strong></td>
+                            <td data-label="Date Joined">${today}</td>
+                            <td data-label="Action">
+                                <button type="button" class="action-button-danger" onclick="unregisterFromNGO(${ngoId})">Leave</button>
+                            </td>
+                        `;
+                        registeredList.appendChild(newRow);
+                        console.log('[v0] NGO added to registered list');
+                    }
+                }
+            }, 300);
         } else {
             registerBtn.disabled = false;
             registerBtn.textContent = 'Register';
@@ -638,6 +695,7 @@ function registerWithNGO(ngoId) {
 
 /**
  * Unregister from an NGO via AJAX
+ * NO RELOAD: DOM updated async, item moved from registered to available
  * @param {number} ngoId - ID of the NGO to unregister from
  */
 function unregisterFromNGO(ngoId) {
@@ -646,11 +704,11 @@ function unregisterFromNGO(ngoId) {
     }
     
     const csrftoken = getCookie('csrftoken');
-    const unregisterBtn = document.getElementById(`unregister-btn-${ngoId}`);
+    const unregisterBtn = document.querySelector(`button[onclick="unregisterFromNGO(${ngoId})"]`);
     
     if (unregisterBtn) {
         unregisterBtn.disabled = true;
-        unregisterBtn.textContent = 'Unregistering...';
+        unregisterBtn.textContent = 'Leaving...';
     }
     
     fetch(`/volunteer/unregister/ngo/${ngoId}/`, {
@@ -664,11 +722,55 @@ function unregisterFromNGO(ngoId) {
     .then(data => {
         if (data.success) {
             showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 1500);
+            
+            // NO RELOAD: Remove from registered list
+            setTimeout(() => {
+                const registeredRow = document.getElementById(`registered-ngo-${ngoId}`);
+                if (registeredRow) {
+                    registeredRow.style.transition = 'opacity 0.3s ease-out';
+                    registeredRow.style.opacity = '0';
+                    setTimeout(() => {
+                        registeredRow.remove();
+                        
+                        // Check if registered list is empty
+                        const registeredList = document.getElementById('registered-ngos-tbody');
+                        if (registeredList && registeredList.querySelectorAll('tr:not(:has(.empty-state))').length === 0) {
+                            const emptyRow = document.createElement('tr');
+                            emptyRow.id = 'registered-empty';
+                            emptyRow.innerHTML = '<td colspan="3"><div class="empty-state"><p>Not Registered with Any NGOs</p></div></td>';
+                            registeredList.appendChild(emptyRow);
+                        }
+                    }, 300);
+                }
+                
+                // Add back to available list if data has ngo info
+                if (data.ngo_name) {
+                    const availableList = document.getElementById('available-ngos-tbody');
+                    if (availableList) {
+                        // Remove empty state if exists
+                        const emptyRow = availableList.querySelector('tr:has(.empty-state)');
+                        if (emptyRow) {
+                            emptyRow.remove();
+                        }
+                        
+                        const newRow = document.createElement('tr');
+                        newRow.id = `available-ngo-${ngoId}`;
+                        newRow.innerHTML = `
+                            <td data-label="NGO Name"><strong>${data.ngo_name}</strong></td>
+                            <td data-label="Address">${data.address || ''}</td>
+                            <td data-label="Action">
+                                <button type="button" class="action-button" onclick="registerWithNGO(${ngoId})">Join</button>
+                            </td>
+                        `;
+                        availableList.appendChild(newRow);
+                        console.log('[v0] NGO returned to available list');
+                    }
+                }
+            }, 300);
         } else {
             if (unregisterBtn) {
                 unregisterBtn.disabled = false;
-                unregisterBtn.textContent = 'Unregister';
+                unregisterBtn.textContent = 'Leave';
             }
             showToast(data.message || 'Failed to unregister', 'error');
         }
@@ -677,7 +779,7 @@ function unregisterFromNGO(ngoId) {
         console.error('[v0] Error unregistering from NGO:', error);
         if (unregisterBtn) {
             unregisterBtn.disabled = false;
-            unregisterBtn.textContent = 'Unregister';
+            unregisterBtn.textContent = 'Leave';
         }
         showToast('An error occurred. Please try again.', 'error');
     });

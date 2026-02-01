@@ -250,14 +250,52 @@
             .then(data => {
                 if (data.success) {
                     showToast(data.message, 'success');
+                    
+                    // NO RELOAD: Update the donation card UI instead
                     closeRatingModal();
-                    setTimeout(() => location.reload(), 1000);
+                    setTimeout(() => {
+                        const donationCard = document.getElementById(`donation-card-${donationId}`);
+                        if (donationCard) {
+                            // Fade out and update
+                            donationCard.style.transition = 'opacity 0.3s ease-out';
+                            donationCard.style.opacity = '0.5';
+                            
+                            // Reload just this card from server
+                            setTimeout(() => {
+                                fetch(window.location.href)
+                                    .then(r => r.text())
+                                    .then(html => {
+                                        const parser = new DOMParser();
+                                        const newDoc = parser.parseFromString(html, 'text/html');
+                                        const newCard = newDoc.getElementById(`donation-card-${donationId}`);
+                                        if (newCard && donationCard) {
+                                            donationCard.outerHTML = newCard.outerHTML;
+                                            console.log('[v0] Donation card updated with rating');
+                                        }
+                                    })
+                                    .catch(e => console.error('[v0] Error updating card:', e));
+                            }, 300);
+                        } else {
+                            // Fallback: refresh entire list
+                            fetch(window.location.href)
+                                .then(r => r.text())
+                                .then(html => {
+                                    const parser = new DOMParser();
+                                    const newDoc = parser.parseFromString(html, 'text/html');
+                                    const newList = newDoc.querySelector('.donations-list');
+                                    const currentList = document.querySelector('.donations-list');
+                                    if (newList && currentList) {
+                                        currentList.innerHTML = newList.innerHTML;
+                                    }
+                                });
+                        }
+                    }, 300);
                 } else {
                     showToast(data.message, 'error');
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('[v0] Error:', error);
                 showToast('An error occurred. Please try again.', 'error');
             });
         });
