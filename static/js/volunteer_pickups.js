@@ -207,13 +207,16 @@ function calculateOptimizedRoute() {
     .then(data => {
         if (data.success) {
             displayPickupRoute(data);
-            // showToast('Optimal route calculated!', 'success'); // Toast removed as requested
         } else {
-            // Silently fail if just no routes (e.g. after cancellation)
+            console.warn('[v0] Route calculation failed, falling back to basic map:', data.message);
+            // Fallback: If route calc fails (e.g. no location), still render points
+            renderFallbackMap();
         }
     })
     .catch(error => {
         console.error('[v0] Error calculating route:', error);
+        // Fallback on error
+        renderFallbackMap();
     })
     .finally(() => {
         if (btn) {
@@ -233,12 +236,8 @@ function calculateOptimizedRoute() {
 function displayPickupRoute(data) {
     const mapContainer = document.getElementById('pickup-map-container');
     const infoBanner = document.getElementById('route-info-banner');
-    const mapElement = document.getElementById('pickup-route-map');
     
-    if (!mapContainer || !mapElement) {
-        console.error('[v0] Pickup map container not found');
-        return;
-    }
+    if (!mapContainer) return;
     
     // Show the map container
     mapContainer.style.display = 'block';
@@ -261,11 +260,6 @@ function displayPickupRoute(data) {
                 badge.textContent = index;
                 badge.style.display = 'inline-flex';
             }
-            // Highlight the first pickup
-            const card = document.getElementById(`pickup-card-${loc.id}`);
-            if (card && index === 1) {
-                card.classList.add('highlighted');
-            }
         }
     });
     
@@ -283,19 +277,11 @@ function displayPickupRoute(data) {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickupMapInstance);
     
     // Ensure map renders correctly after container becomes visible
-    // CRITICAL: This fixes "map not rendering"
-    console.log('[v0] Map initialized, waiting for rendering');
     setTimeout(() => {
-        console.log('[v0] Invalidating map size');
         pickupMapInstance.invalidateSize(true);
     }, 150);
     
-    // Extra invalidation for stubborn rendering
-    setTimeout(() => {
-        pickupMapInstance.invalidateSize(true);
-    }, 500);
-    
-    // 1. Add Custom Markers manually (for better UI)
+    // 1. Add Custom Markers
     data.route.forEach((loc, index) => {
         if (index === 0) {
             // Volunteer marker
@@ -311,40 +297,94 @@ function displayPickupRoute(data) {
         }
     });
 
-    // 2. Add Routing Path (Using Leaflet Routing Machine if available)
+    // 2. Add Routing Path
     if (typeof L.Routing !== 'undefined') {
         const waypoints = data.route.map(loc => L.latLng(loc.lat, loc.lon));
         
         pickupRoutingControl = L.Routing.control({
             waypoints: waypoints,
             router: L.Routing.osrmv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1' // Standard demo server
+                serviceUrl: 'https://router.project-osrm.org/route/v1'
             }),
             lineOptions: {
                 styles: [{color: '#3b82f6', opacity: 0.8, weight: 6}]
             },
-            createMarker: function() { return null; }, // Suppress default markers, we use custom ones above
+            createMarker: function() { return null; },
             addWaypoints: false,
             draggableWaypoints: false,
             fitSelectedRoutes: true,
-            show: false // Hide the itinerary text container
+            show: false
         }).addTo(pickupMapInstance);
-        
-        console.log('[v0] Routing control added for path visualization');
     } else {
-        // Fallback: Just fit bounds if routing library is missing
-        console.warn('[v0] Leaflet Routing Machine not loaded. Showing straight lines/bounds only.');
         const bounds = L.latLngBounds(data.route.map(loc => L.latLng(loc.lat, loc.lon)));
         pickupMapInstance.fitBounds(bounds, { padding: [50, 50] });
     }
-    
-    // Show live tracking indicator
-    const trackingStatus = document.getElementById('live-tracking-status');
-    if (trackingStatus) trackingStatus.style.display = 'flex';
 }
 
-// ============ PICKUP MAP SPECIFIC CODE ============
-// (Delivery map code is now in volunteer_deliveries.js - separate file)
+/**
+ * FALLBACK: Render map with markers only (when route calc fails)
+ * This ensures the map is always visible even if the API or Location fails.
+ */
+function renderFallbackMap() {
+    const mapContainer = document.getElementById('pickup-map-container');
+    if (!mapContainer) return;
+
+    console.log('[v0] Rendering fallback map (markers only)');
+    mapContainer.style.display = 'block';
+
+    if (pickupMapInstance) {
+        pickupMapInstance.remove();
+        pickupMapInstance = null;
+    }
+
+    pickupMapInstance = L.map('pickup-route-map', {
+        zoomControl: true,
+        attributionControl: false
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickupMapInstance);
+
+    setTimeout(() => {
+        pickupMapInstance.invalidateSize(true);
+    }, 150);
+
+    const bounds = L.latLngBounds();
+    let hasPoints = false;
+
+    // Add current location if available
+    if (currentVolunteerPosition) {
+        volunteerPickupMarker = L.marker([currentVolunteerPosition.lat, currentVolunteerPosition.lon], {
+            icon: bikeIcon
+        }).addTo(pickupMapInstance);
+        bounds.extend([currentVolunteerPosition.lat, currentVolunteerPosition.lon]);
+        hasPoints = true;
+    }
+
+    // Collect all uncollected pickup points from DOM
+    const pickupCards = document.querySelectorAll('.pickup-item-card:not([data-status="collected"])');
+    
+    pickupCards.forEach((card, index) => {
+        const lat = parseFloat(card.getAttribute('data-lat'));
+        const lon = parseFloat(card.getAttribute('data-lon'));
+        const title = card.querySelector('h4') ? card.querySelector('h4').textContent : 'Pickup';
+
+        if (!isNaN(lat) && !isNaN(lon)) {
+            L.marker([lat, lon], {
+                icon: createRestaurantIcon(index + 1)
+            }).addTo(pickupMapInstance).bindPopup(`<strong>${title}</strong>`);
+            
+            bounds.extend([lat, lon]);
+            hasPoints = true;
+        }
+    });
+
+    if (hasPoints) {
+        pickupMapInstance.fitBounds(bounds, { padding: [50, 50] });
+    } else {
+        // Default view if no points found (e.g. Delhi)
+        pickupMapInstance.setView([28.6139, 77.2090], 11); 
+    }
+}
 
 // ============ LIVE LOCATION TRACKING ============
 
