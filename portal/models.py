@@ -111,7 +111,6 @@ class DonationCamp(models.Model):
     def __str__(self):
         return f"{self.name} by {self.ngo.ngo_name}"
 
-
 class Donation(models.Model):
     class DonationStatus(models.TextChoices):
         PENDING = 'PENDING', 'Pending Pickup'
@@ -154,7 +153,6 @@ class Donation(models.Model):
     def __str__(self):
         return f"Donation from {self.restaurant.restaurant_name} ({self.status})"
 
-# Badge System for Volunteers
 class Badge(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField()
