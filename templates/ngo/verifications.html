@@ -214,16 +214,22 @@
         <div class="stat-number">{{ verified_donations|length }}</div>
         <div class="stat-label">Recently Verified</div>
     </div>
+    <div class="verification-stat-card rejected" style="border-left: 4px solid #ef4444;">
+        <div class="stat-number">{{ rejected_donations|length }}</div>
+        <div class="stat-label">Returned / Rejected</div>
+    </div>
 </div>
 
 {# Tab Navigation #}
 <div class="tabs">
     <button class="tab-btn active" onclick="showTab('pending')">Pending ({{ pending_count }})</button>
     <button class="tab-btn" onclick="showTab('verified')">Recently Verified</button>
+    <button class="tab-btn" onclick="showTab('rejected')">Returned</button>
 </div>
 
 {# Pending Verifications Tab #}
 <div id="pending-tab" class="tab-content active">
+    <!-- Pending content exists here -->
     <div class="content-card">
         <h3>Deliveries Awaiting Verification</h3>
         
@@ -280,37 +286,84 @@
         <h3>Recently Verified Deliveries</h3>
         
         {% if verified_donations %}
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Volunteer</th>
-                    <th>Food Description</th>
-                    <th>From</th>
-                    <th>Camp</th>
-                    <th>Verified</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for donation in verified_donations %}
-                <tr>
-                    <td data-label="Volunteer">{{ donation.assigned_volunteer.full_name }}</td>
-                    <td data-label="Food">{{ donation.food_description }}</td>
-                    <td data-label="From">{{ donation.restaurant.restaurant_name }}</td>
-                    <td data-label="Camp">{{ donation.target_camp.name }}</td>
-                    <td data-label="Verified">
-                        <span class="verified-badge">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="20 6 9 17 4 12"/>
-                            </svg>
-                            {{ donation.verified_at|timesince }} ago
-                        </span>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div style="overflow-x: auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Volunteer</th>
+                        <th>Food Description</th>
+                        <th>From</th>
+                        <th>Camp</th>
+                        <th>Verified</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for donation in verified_donations %}
+                    <tr>
+                        <td data-label="Volunteer">{{ donation.assigned_volunteer.full_name }}</td>
+                        <td data-label="Food">{{ donation.food_description }}</td>
+                        <td data-label="From">{{ donation.restaurant.restaurant_name }}</td>
+                        <td data-label="Camp">{{ donation.target_camp.name }}</td>
+                        <td data-label="Verified">
+                            <span class="verified-badge">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                                {{ donation.verified_at|timesince }} ago
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
         <p class="empty-state">No verified deliveries yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+{# Rejected/Returned Tab #}
+<div id="rejected-tab" class="tab-content">
+    <div class="content-card">
+        <h3>Returned / Rejected Deliveries</h3>
+        <p class="section-description" style="color: #6b7280; font-size: 0.9rem; margin-bottom: 1rem;">
+            These items were rejected and sent back to "Collected" status for re-delivery attempts.
+        </p>
+        
+        {% if rejected_donations %}
+        <div style="overflow-x: auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Volunteer</th>
+                        <th>Food</th>
+                        <th>Camp</th>
+                        <th>Reason / Notes</th>
+                        <th>Last Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for donation in rejected_donations %}
+                    <tr>
+                        <td data-label="Volunteer">{{ donation.assigned_volunteer.full_name }}</td>
+                        <td data-label="Food">{{ donation.food_description }}</td>
+                        <td data-label="Camp">{{ donation.target_camp.name }}</td>
+                        <td data-label="Reason">
+                            <span style="color: #ef4444; font-weight: 500;">
+                                {{ donation.verification_notes|default:"Quality issues" }}
+                            </span>
+                        </td>
+                        <td data-label="Last Action">
+                            {{ donation.updated_at|timesince }} ago
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="empty-state">No rejected deliveries found.</p>
         {% endif %}
     </div>
 </div>

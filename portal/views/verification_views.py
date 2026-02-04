@@ -43,10 +43,22 @@ def ngo_pending_verifications(request):
         'assigned_volunteer',
         'target_camp'
     ).order_by('-delivered_at')[:20]
+
+    # Get rejected/returned donations (Available for re-delivery)
+    rejected_donations = Donation.objects.filter(
+        target_camp__ngo=ngo_profile,
+        status='COLLECTED',
+        verification_count__gt=0
+    ).select_related(
+        'restaurant',
+        'assigned_volunteer',
+        'target_camp'
+    ).order_by('-updated_at')[:20]
     
     context = {
         'pending_donations': pending_donations,
         'verified_donations': verified_donations,
+        'rejected_donations': rejected_donations,
         'pending_count': pending_donations.count(),
         'ngo_profile': ngo_profile
     }
@@ -86,6 +98,7 @@ def verify_and_approve_donation(request, donation_id):
             donation.verified_at = timezone.now()
             donation.verified_by = request.user
             donation.is_verified = True
+            donation.verification_notes = "Verified and Approved" # clear any old rejection notes
             donation.save()
             
             # Log verified delivery
@@ -139,6 +152,7 @@ def reject_donation_verification(request, donation_id):
             donation.status = 'COLLECTED'
             donation.delivered_at = None
             donation.verification_count += 1
+            donation.verification_notes = f"Rejected: {rejection_reason}"
             donation.save()
             
             # Log rejected delivery
