@@ -90,6 +90,18 @@ def volunteer_pickups(request):
         status='COLLECTED'
     ).count()
     
+    # Return JSON for AJAX search requests
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        data = [{
+            'pk': d.pk,
+            'restaurant_name': d.restaurant.restaurant_name,
+            'food_description': d.food_description,
+            'pickup_address': d.pickup_address,
+            'latitude': d.restaurant.latitude,
+            'longitude': d.restaurant.longitude
+        } for d in available_donations]
+        return JsonResponse({'success': True, 'donations': data})
+
     context = {
         'active_donations': active_donations,
         'available_donations': available_donations,

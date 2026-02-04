@@ -101,7 +101,96 @@ document.addEventListener('DOMContentLoaded', function () {
     
     // Always start GPS tracking (it's independent of map library)
     startLiveLocationTracking();
+    
+    // Initialize Search
+    initializeSearch();
 });
+
+function initializeSearch() {
+    const searchForm = document.querySelector('form[action$="volunteer_manage_pickups"]');
+    if (searchForm) {
+        // Debounce timer
+        let debounceTimer;
+        const searchInput = searchForm.querySelector('input[name="q"]');
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    performSearch(this.value);
+                }, 500);
+            });
+        }
+        
+        searchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            performSearch(searchInput ? searchInput.value : '');
+        });
+    }
+}
+
+function performSearch(query) {
+    const tbody = document.getElementById('available-donations-tbody');
+    if (!tbody) return;
+    
+    tbody.style.opacity = '0.5';
+    
+    fetch(`/dashboard/volunteer/pickups/?q=${encodeURIComponent(query)}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            renderAvailableDonations(data.donations);
+        }
+        tbody.style.opacity = '1';
+    })
+    .catch(err => {
+        console.error('Search error:', err);
+        tbody.style.opacity = '1';
+    });
+}
+
+function renderAvailableDonations(donations) {
+    const container = document.getElementById('available-donations-container') || document.querySelector('.content-card:last-child'); // Fallback
+    let tbody = document.getElementById('available-donations-tbody');
+    
+    if (donations.length === 0) {
+        if (tbody) {
+            tbody.innerHTML = '';
+            // Ideally show empty message
+             if (!document.getElementById('search-empty-msg')) {
+                 const msg = document.createElement('tr');
+                 msg.id = 'search-empty-msg';
+                 msg.innerHTML = '<td colspan="4" class="empty-state">No donations found matching your search.</td>';
+                 tbody.appendChild(msg);
+             }
+        }
+        return;
+    }
+    
+    // Remove empty message if exists
+    const emptyMsg = document.getElementById('search-empty-msg');
+    if (emptyMsg) emptyMsg.remove();
+    
+    if (!tbody) return;
+    
+    tbody.innerHTML = donations.map(d => `
+        <tr id="donation-row-${d.pk}">
+            <td data-label="Restaurant"><strong>${d.restaurant_name}</strong></td>
+            <td data-label="Food Description">${d.food_description}</td>
+            <td data-label="Address">${d.pickup_address}</td>
+            <td data-label="Action">
+                <button type="button" class="action-button" id="accept-btn-${d.pk}" 
+                        data-testid="accept-donation-btn-${d.pk}" onclick="acceptDonation(${d.pk})">
+                    Accept
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
 
 /**
  * Initialize Pickup Mode - handles all map logic and state management
@@ -147,6 +236,10 @@ function showPickupMapMode() {
     const infoBanner = document.getElementById('route-info-banner');
     const deliveryBtn = document.getElementById('delivery-button-container');
     
+    // Hide Delivery elements if visible (SPA switch)
+    const deliveryMap = document.getElementById('delivery-mode-container');
+    if (deliveryMap) deliveryMap.style.display = 'none';
+
     if (mapContainer) mapContainer.style.display = 'block';
     if (infoBanner) infoBanner.style.display = 'none'; // Will show after route is calculated
     if (deliveryBtn) deliveryBtn.style.display = 'none';
@@ -175,8 +268,172 @@ function showDeliveryButton() {
     const deliveryBtn = document.getElementById('delivery-button-container');
     if (deliveryBtn) {
         deliveryBtn.style.display = 'block';
+        // Add click handler for SPA transition
+        const link = deliveryBtn.querySelector('a');
+        if (link) {
+            link.onclick = function(e) {
+                e.preventDefault();
+                startDeliveryMode();
+            };
+        }
     }
 }
+
+/**
+ * Start Delivery Mode (SPA Transition)
+ * Calculates route to nearest camp and renders delivery UI without reload
+ */
+function startDeliveryMode() {
+    // Hide Pickup UI
+    hideAllPickupMode();
+    
+    // Show Loading or Delivery Container
+    // We assume pickups.html has a placeholder for delivery mode
+    let deliveryContainer = document.getElementById('delivery-mode-container');
+    if (!deliveryContainer) {
+        // Create container dynamically if missing
+        deliveryContainer = document.createElement('div');
+        deliveryContainer.id = 'delivery-mode-container';
+        deliveryContainer.className = 'content-card';
+        deliveryContainer.innerHTML = '<h3 style="margin-bottom:1rem;">Route to Nearest Camp</h3><div id="delivery-map-spa" style="height: 400px; width: 100%; border-radius: 12px; margin-bottom: 1rem;"></div><div id="delivery-info-spa" class="delivery-info-container"></div>';
+        
+        // Insert after pickup stats
+        const stats = document.querySelector('.pickup-stats');
+        if (stats) stats.parentNode.insertBefore(deliveryContainer, stats.nextSibling);
+    }
+    
+    deliveryContainer.style.display = 'block';
+    
+    const deliveryMap = document.getElementById('delivery-map-spa');
+    if (deliveryMap) {
+        deliveryMap.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;background:#f9fafb;color:#6b7280;">Calculating route to nearest camp...</div>';
+    }
+
+    // Call API to get route and camp details
+    fetch('/api/calculate-delivery-route/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(currentVolunteerPosition ? {
+            current_lat: currentVolunteerPosition.lat,
+            current_lon: currentVolunteerPosition.lon
+        } : {})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            renderDeliveryMap(data);
+        } else {
+            showToast(data.message || 'Failed to calculate delivery route', 'error');
+            // Show fallback UI
+            document.getElementById('delivery-map-spa').innerHTML = `<p class="error-msg">${data.message}</p>`;
+        }
+    })
+    .catch(err => {
+        console.error('Error starting delivery mode:', err);
+        showToast('Error starting delivery mode', 'error');
+    });
+}
+
+function renderDeliveryMap(data) {
+    // Logic similar to deliveries.js but adapted for SPA container
+    const mapId = 'delivery-map-spa';
+    const deliveryInfoId = 'delivery-info-spa';
+    
+    // Clean previous map instance if needed (reuse variable or create new scope?)
+    // Uses global deliveryMapInstance variable
+    if (window.spaDeliveryMapInstance) {
+        window.spaDeliveryMapInstance.remove();
+        window.spaDeliveryMapInstance = null;
+    }
+    
+    const map = L.map(mapId, { zoomControl: true, attributionControl: false });
+    window.spaDeliveryMapInstance = map; // Store globally
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    
+    const route = data.route; // Array of points
+    const camp = data.nearest_camp;
+    
+    // Fit bounds
+    if (route && route.length > 0) {
+        const bounds = L.latLngBounds(route.map(p => [p.lat, p.lon]));
+        map.fitBounds(bounds, { padding: [50, 50] });
+    }
+    
+    // Add Markers
+    // Volunteer
+    if (bikeIcon && route.length > 0) {
+        L.marker([route[0].lat, route[0].lon], { icon: bikeIcon, zIndexOffset: 1000 }).addTo(map).bindPopup('Your Location');
+    }
+    // Camp
+    if (campIcon) {
+         L.marker([camp.latitude || route[route.length-1].lat, camp.longitude || route[route.length-1].lon], { icon: campIcon }).addTo(map)
+         .bindPopup(`<strong>${camp.name}</strong><br>${camp.ngo_name}`);
+    }
+    
+    // Draw Line
+    const latlngs = route.map(p => [p.lat, p.lon]);
+    L.polyline(latlngs, { color: '#10b981', weight: 5, opacity: 0.8 }).addTo(map);
+    
+    // Render Info
+    const info = document.getElementById(deliveryInfoId);
+    info.innerHTML = `
+        <div class="route-summary">
+            <div style="flex: 1;">
+                <p><strong>Distance:</strong> ${data.total_distance_km} km</p>
+                <p><strong>Estimated Time:</strong> ${data.estimated_time_minutes} minutes</p>
+                <p><strong>Destination:</strong> <strong>${camp.name}</strong> (${camp.ngo_name})</p>
+            </div>
+            <div>
+                <button type="button" class="btn-primary-action" data-testid="confirm-delivery-btn" onclick="confirmDeliverySPA(${camp.id})">
+                    Confirm & Mark All as Delivered
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+window.confirmDeliverySPA = function(campId) {
+    if (!confirm('Are you sure you want to mark these items as delivered?')) return;
+    
+    const btn = document.querySelector('button[data-testid="confirm-delivery-btn"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Processing...'; }
+    
+    fetch(`/donation/deliver/to/${campId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Delivery Confirmed!', 'success');
+            // Hide Map, Show Success State
+            const container = document.getElementById('delivery-mode-container');
+            container.innerHTML = `
+                <div class="success-card" style="text-align:center; padding: 2rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
+                    <h3>Delivery Completed!</h3>
+                    <p>${data.message}</p>
+                    <button class="btn-primary-action" onclick="location.reload()">Return to Dashboard</button>
+                </div>
+            `;
+            // Update stats logic here if we want to avoid reload entirely...
+            // But reload is safer to reset state for new pickups.
+            // Or fetch updated stats via get_volunteer_stats API I wrote.
+        } else {
+             showToast(data.message, 'error');
+             if (btn) { btn.disabled = false; btn.textContent = 'Confirm & Mark All as Delivered'; }
+        }
+    })
+    .catch(e => {
+        console.error(e);
+        showToast('Error confirming delivery', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Confirm & Mark All as Delivered'; }
+    });
+};
 
 /**
  * Hide all pickup mode elements
