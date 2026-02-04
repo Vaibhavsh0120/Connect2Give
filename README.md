@@ -1,18 +1,12 @@
 # Connect2Give 🌍🤝
 
-<p align="center">
-
 [![Live Demo](https://img.shields.io/badge/LIVE_DEMO-Click_Here-success?style=for-the-badge&logo=pythonanywhere)](https://vaibhav0120.pythonanywhere.com/)
 
-</p>
-<br>
-<p align="center">
 
 [![Django](https://img.shields.io/badge/Django-5.2-092E20?style=for-the-badge&logo=django)](https://www.djangoproject.com/)
 [![Python](https://img.shields.io/badge/Python-3.10-3776AB?style=for-the-badge&logo=python)](https://www.python.org/)
 [![Bootstrap](https://img.shields.io/badge/Bootstrap-5-7952B3?style=for-the-badge&logo=bootstrap)](https://getbootstrap.com/)
 
-</p>
 **Connect2Give** is a comprehensive food donation platform connecting Restaurants, NGOs, and Volunteers to efficiently redistribute surplus food. It features real-time routing, role-based dashboards, and a tiered verification system.
 
 ## 🚀 Live Demo
