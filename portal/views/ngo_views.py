@@ -14,6 +14,7 @@ import socket  # Imported to help catch network errors
 from ..models import DonationCamp, Donation, NGOProfile, VolunteerProfile, User, NGOVolunteer
 from ..forms import DonationCampForm, NGOProfileForm, NGORegisterVolunteerForm
 from ..decorators import user_type_required
+from ..utils.verification import validate_ngo_darpan_format
 
 @login_required(login_url='login_page')
 @user_type_required('NGO')
@@ -104,8 +105,19 @@ def ngo_profile(request):
                 request.user.save()
         
         if form.is_valid() and not username_error:
-            form.save()
-            messages.success(request, 'Your profile has been updated successfully!')
+            profile = form.save()
+            
+            # Auto-verify NGO if Darpan ID format is valid
+            ngo_darpan_id = profile.ngo_darpan_id
+            if ngo_darpan_id and validate_ngo_darpan_format(ngo_darpan_id):
+                if not request.user.is_verified:
+                    request.user.is_verified = True
+                    request.user.save()
+                    messages.success(request, 'Your profile has been updated and your organization is now verified!')
+                else:
+                    messages.success(request, 'Your profile has been updated successfully!')
+            else:
+                messages.success(request, 'Your profile has been updated successfully!')
             return redirect('ngo_profile')
         elif username_error:
             messages.error(request, username_error)

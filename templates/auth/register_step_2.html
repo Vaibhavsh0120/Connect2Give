@@ -33,7 +33,7 @@
                     <p>Tell us more about yourself</p>
                 </div>
 
-                <form action="{% url 'register_step_2' %}" method="POST">
+                <form action="{% url 'register_step_2' %}" method="POST" enctype="multipart/form-data">
                     {% csrf_token %}
                     
                     <input type="hidden" name="latitude" id="id_latitude">
@@ -73,6 +73,18 @@
                                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);">
                             <small class="form-help-text">10 digits only</small>
                         </div>
+                        <div class="form-group">
+                            <label for="fssai_number">FSSAI License Number <span class="required-star">*</span></label>
+                            <input type="text" 
+                                   name="fssai_number" 
+                                   id="fssai_number" 
+                                   data-required-for="RESTAURANT"
+                                   pattern="[0-9]{14}" 
+                                   maxlength="14" 
+                                   placeholder="12345678901234"
+                                   oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 14);">
+                            <small class="form-help-text">14-digit valid FSSAI number (Auto-verified)</small>
+                        </div>
                     </div>
 
                     <div id="ngo-fields" class="hidden-fields">
@@ -82,8 +94,15 @@
                             <input type="text" name="ngo_name" id="ngo_name" data-required-for="NGO">
                         </div>
                         <div class="form-group">
-                            <label for="registration_number">Registration Number <span class="required-star">*</span></label>
-                            <input type="text" name="registration_number" id="registration_number" data-required-for="NGO">
+                            <label for="ngo_darpan_id">NGO Darpan ID <span class="required-star">*</span></label>
+                            <input type="text" 
+                                   name="ngo_darpan_id" 
+                                   id="ngo_darpan_id" 
+                                   data-required-for="NGO"
+                                   placeholder="AA/YYYY/NNNNNN"
+                                   pattern="^[A-Z]{2}/\d{4}/\d{6}$"
+                                   title="Format: AA/YYYY/NNNNNN">
+                            <small class="form-help-text">Unique NGO Darpan ID (Format: AA/YYYY/NNNNNN)</small>
                         </div>
                         <div class="form-group">
                             <label for="contact_number">Contact Number <span class="required-star">*</span></label>

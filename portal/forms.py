@@ -92,11 +92,15 @@ class NGOProfileForm(forms.ModelForm):
         widget=forms.EmailInput(attrs={'class': 'form-control'})
     )
     
-    # --- Signup Field: Registration Number (Step 2 - Read Only) ---
-    registration_number = forms.CharField(
-        label="Registration Number",
-        required=False,
-        widget=forms.TextInput(attrs={'disabled': 'disabled', 'class': 'form-control bg-gray-100'})
+    # --- Signup Field: NGO Darpan ID (Step 2 - New Verification) ---
+    ngo_darpan_id = forms.CharField(
+        label="NGO Darpan ID",
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control', 
+            'placeholder': 'e.g., AA/2021/012345'
+        }),
+        help_text="Format: AA/YYYY/NNNNNN (Check on NGO Darpan website)"
     )
 
     class Meta:
@@ -108,7 +112,8 @@ class NGOProfileForm(forms.ModelForm):
             'latitude', 
             'longitude', 
             'profile_picture', 
-            'banner_image'
+            'banner_image',
+            'ngo_darpan_id'
         ]
         labels = {
             'ngo_name': 'Organization Name',
@@ -138,9 +143,11 @@ class NGOProfileForm(forms.ModelForm):
         if self.instance.pk:
             # Populate fields from User model
             self.fields['email'].initial = self.instance.user.email
+            # Populate fields from User model
+            self.fields['email'].initial = self.instance.user.email
             self.fields['full_name'].initial = self.instance.user.get_full_name()
-            # Populate disabled field
-            self.fields['registration_number'].initial = self.instance.registration_number
+            # Populate fields
+            self.fields['ngo_darpan_id'].initial = self.instance.ngo_darpan_id
 
     def clean_contact_number(self):
         """Validate contact number format and SYSTEM-WIDE uniqueness"""
@@ -193,6 +200,18 @@ class RestaurantProfileForm(forms.ModelForm):
         widget=forms.EmailInput(attrs={'class': 'form-control'})
     )
 
+    # --- Signup Field: FSSAI Number (Verify) ---
+    fssai_number = forms.CharField(
+        label="FSSAI License Number",
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '14-digit FSSAI Number',
+            'maxlength': '14'
+        }),
+        help_text="Enter your 14-digit valid FSSAI license number for automatic verification."
+    )
+
     class Meta:
         model = RestaurantProfile
         fields = [
@@ -202,6 +221,7 @@ class RestaurantProfileForm(forms.ModelForm):
             'latitude',
             'longitude',
             'profile_picture',
+            'fssai_number'
         ]
         labels = {
             'restaurant_name': 'Restaurant Name',
@@ -229,6 +249,12 @@ class RestaurantProfileForm(forms.ModelForm):
         # Check against ALL profiles (Restaurant, NGO, Volunteer)
         validate_phone_unique_systemwide(phone, exclude_user_id=self.instance.user.pk)
         return phone
+
+    def clean_fssai_number(self):
+        fssai = self.cleaned_data.get('fssai_number', '').strip()
+        if not fssai.isdigit() or len(fssai) != 14:
+             raise ValidationError("FSSAI number must be exactly 14 digits.")
+        return fssai
 
     def clean_email(self):
         """Validate email uniqueness"""

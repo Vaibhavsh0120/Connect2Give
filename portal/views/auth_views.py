@@ -10,7 +10,13 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.conf import settings
+from django.db import transaction
 from ..models import User, RestaurantProfile, NGOProfile, VolunteerProfile
+from ..utils.verification import verify_fssai, validate_ngo_darpan_format
 
 def get_user_dashboard_redirect(user):
     # If the user is a superuser (Admin), redirect to index to show the restriction message
@@ -119,21 +125,27 @@ def register_step_2(request):
         # --- NEW VALIDATION: Check if Profile Details Already Exist ---
         profile_error = None
         
-        if user_type == User.UserType.NGO:
-            registration_number = request.POST.get('registration_number')
-            if NGOProfile.objects.filter(registration_number=registration_number).exists():
-                profile_error = 'This Registration Number is already registered with another NGO.'
-            
+        if user_type == User.UserType.NGO:            
             # Validate contact number
             contact_number = request.POST.get('contact_number', '').strip()
             if not contact_number.isdigit() or len(contact_number) != 10:
                 profile_error = 'Contact number must be exactly 10 digits.'
-                
+            
+            # Validate Darpan ID
+            ngo_darpan_id = request.POST.get('ngo_darpan_id', '').strip()
+            if not validate_ngo_darpan_format(ngo_darpan_id):
+                 profile_error = 'Invalid NGO Darpan ID format. Use format AA/YYYY/NNNNNN.'
+
         elif user_type == User.UserType.RESTAURANT:
             # Check if restaurant phone number is already taken
             phone_number = request.POST.get('restaurant_phone_number')
             if RestaurantProfile.objects.filter(phone_number=phone_number).exists():
                 profile_error = 'This phone number is already registered with another restaurant.'
+            
+            # FSSAI check
+            fssai_number = request.POST.get('fssai_number', '').strip()
+            if not fssai_number.isdigit() or len(fssai_number) != 14:
+                profile_error = 'FSSAI number must be exactly 14 digits.'
 
         if profile_error:
             # Pass user context back if authenticated so they don't lose session info
@@ -144,54 +156,86 @@ def register_step_2(request):
             return render(request, 'auth/register_step_2.html', context)
         # -------------------------------------------------------------
         
-        user = None
-        if registration_data: # Manual registration flow
-            # Username is now collected in Step 2, so we use the 'username' variable from POST directly.
-            # Fallback to session is no longer needed for 'username', but kept for robustness if logic changes back.
-            step1_username = registration_data.get('username', username)
-            
-            user = User.objects.create_user(
-                username=step1_username,
-                email=registration_data['email'],
-                password=registration_data['password'],
-                user_type=user_type,
-                first_name=registration_data.get('full_name', '').split(' ')[0],
-                last_name=' '.join(registration_data.get('full_name', '').split(' ')[1:])
-            )
-            del request.session['registration_data']
+        try:
+            with transaction.atomic():
+                user = None
+                if registration_data: # Manual registration flow
+                    # Username is now collected in Step 2, so we use the 'username' variable from POST directly.
+                    # Fallback to session is no longer needed for 'username', but kept for robustness if logic changes back.
+                    step1_username = registration_data.get('username', username)
+                    
+                    user = User.objects.create_user(
+                        username=step1_username,
+                        email=registration_data['email'],
+                        password=registration_data['password'],
+                        user_type=user_type,
+                        first_name=registration_data.get('full_name', '').split(' ')[0],
+                        last_name=' '.join(registration_data.get('full_name', '').split(' ')[1:])
+                    )
+                    del request.session['registration_data']
 
-        elif request.user.is_authenticated: # Google registration flow
-            user = request.user
-            # Update username if user had auto-generated one
-            if user.username != username:
-                user.username = username
-            user.user_type = user_type
-            user.save()
+                elif request.user.is_authenticated: # Google registration flow
+                    user = request.user
+                    # Update username if user had auto-generated one
+                    if user.username != username:
+                        user.username = username
+                    user.user_type = user_type
+                    user.save()
 
-        if user:
-            if user_type == User.UserType.RESTAURANT:
-                RestaurantProfile.objects.create(
-                    user=user,
-                    restaurant_name=request.POST.get('restaurant_name'),
-                    address=address,
-                    phone_number=request.POST.get('restaurant_phone_number'),
-                    latitude=latitude,
-                    longitude=longitude
-                )
-            elif user_type == User.UserType.NGO:
-                # Validation performed above, safe to create
-                NGOProfile.objects.create(
-                    user=user,
-                    ngo_name=request.POST.get('ngo_name'),
-                    registration_number=request.POST.get('registration_number'),
-                    address=address,
-                    contact_number=request.POST.get('contact_number', '').strip(),
-                    latitude=latitude,
-                    longitude=longitude
-                )
-            
-            messages.success(request, 'Registration successful! Please log in.')
-            return redirect('login_page')
+                if user:
+                    if user_type == User.UserType.RESTAURANT:
+                        # Perform Verification
+                        fssai_number = request.POST.get('fssai_number', '').strip()
+                        is_verified = verify_fssai(fssai_number)
+                        verification_status = RestaurantProfile.VerificationStatus.VERIFIED if is_verified else RestaurantProfile.VerificationStatus.PENDING
+                        
+                        # Update User verified status
+                        user.is_verified = is_verified
+                        user.save()
+
+                        RestaurantProfile.objects.create(
+                            user=user,
+                            restaurant_name=request.POST.get('restaurant_name'),
+                            address=address,
+                            phone_number=request.POST.get('restaurant_phone_number'),
+                            latitude=latitude,
+                            longitude=longitude,
+                            fssai_number=fssai_number,
+                            verification_status=verification_status
+                        )
+                    elif user_type == User.UserType.NGO:
+                        # Validation performed above, safe to create
+                        ngo_darpan_id = request.POST.get('ngo_darpan_id', '').strip()
+                        
+                        # Auto-verify NGO if Darpan ID format is valid
+                        is_verified = validate_ngo_darpan_format(ngo_darpan_id)
+                        verification_status = NGOProfile.VerificationStatus.VERIFIED if is_verified else NGOProfile.VerificationStatus.PENDING
+                        
+                        # Update User verified status
+                        user.is_verified = is_verified
+                        user.save()
+                        
+                        NGOProfile.objects.create(
+                            user=user,
+                            ngo_name=request.POST.get('ngo_name'),
+                            ngo_darpan_id=ngo_darpan_id,
+                            address=address,
+                            contact_number=request.POST.get('contact_number', '').strip(),
+                            latitude=latitude,
+                            longitude=longitude,
+                            verification_status=verification_status
+                        )
+        except Exception as e:
+            # If any error occurs inside the atomic block (e.g. Profile creation fails), 
+            # the transaction will rollback (User won't be created).
+            # Log the error if needed
+            print(f"Registration Error: {e}")
+            messages.error(request, "An error occurred during registration. Please try again.")
+            return render(request, 'auth/register_step_2.html', {'error': 'System error. Registration failed.'})
+
+        # If we reach here, transaction succeeded
+        messages.success(request, 'Registration successful! Please log in.')
+        return redirect('login_page')
 
     context = {}
     if request.user.is_authenticated:

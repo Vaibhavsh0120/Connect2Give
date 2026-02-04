@@ -21,6 +21,7 @@ class User(AbstractUser):
         VOLUNTEER = 'VOLUNTEER', 'Volunteer'
     user_type = models.CharField(max_length=10, choices=UserType.choices, default=UserType.ADMIN)
     must_change_password = models.BooleanField(default=False, help_text="Force user to change password on next login")
+    is_verified = models.BooleanField(default=False, help_text="Overall verification status of the user")
     
     def __str__(self):
         return f"{self.username} ({self.get_user_type_display()})" # type: ignore
@@ -29,6 +30,19 @@ class RestaurantProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True, related_name='restaurant_profile')
     restaurant_name = models.CharField(max_length=255, validators=[alphabetic_validator])
     address = models.TextField()
+    fssai_number = models.CharField(max_length=14, blank=True, null=True, help_text="14-digit FSSAI License Number")
+    
+    class VerificationStatus(models.TextChoices):
+        VERIFIED = 'VERIFIED', 'Verified'
+        REJECTED = 'REJECTED', 'Rejected'
+        PENDING = 'PENDING', 'Pending' # Optional if we want manual check fallback
+
+    verification_status = models.CharField(
+        max_length=10, 
+        choices=VerificationStatus.choices, 
+        default=VerificationStatus.PENDING
+    )
+
     # Unique across restaurants (Form will validate system-wide)
     phone_number = models.CharField(max_length=15, unique=True)
     latitude = models.FloatField(null=True, blank=True)
@@ -64,7 +78,19 @@ class VolunteerProfile(models.Model):
 class NGOProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True, related_name='ngo_profile')
     ngo_name = models.CharField(max_length=255, validators=[alphabetic_validator])
-    registration_number = models.CharField(max_length=100, unique=True)
+    ngo_darpan_id = models.CharField(max_length=20, unique=True, null=True, blank=True, help_text="Unique NGO Darpan ID")
+    
+    class VerificationStatus(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        VERIFIED = 'VERIFIED', 'Verified'
+        REJECTED = 'REJECTED', 'Rejected'
+
+    verification_status = models.CharField(
+        max_length=10, 
+        choices=VerificationStatus.choices, 
+        default=VerificationStatus.PENDING
+    )
+
     address = models.TextField()
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)

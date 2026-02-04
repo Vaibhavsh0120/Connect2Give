@@ -10,6 +10,27 @@
 <div class="profile-container">
     <div class="profile-form">
         <form method="POST" enctype="multipart/form-data" action="{% url 'restaurant_profile' %}" id="profile-form">
+            <div class="profile-header-actions" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center;">
+                <div class="verification-status">
+                    {% if user.is_verified %}
+                        <span class="badge verified" style="background: #dcfce7; color: #166534; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            Verified
+                        </span>
+                    {% else %}
+                        <span class="badge pending" style="background: #fef9c3; color: #854d0e; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600;">
+                            Verification Pending
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="action-buttons">
+                    <button type="button" id="edit-profile-btn" onclick="enableEditMode()">Edit Profile</button>
+                    <button type="submit" id="save-changes-btn" style="display: none;">Save Changes</button>
+                </div>
+            </div>
+
             {% csrf_token %}
             {{ form.latitude }}
             {{ form.longitude }}
@@ -44,13 +65,21 @@
                         {{ form.phone_number.label_tag }}
                         {{ form.phone_number }}
                     </div>
+
+                    <div class="form-group">
+                        {{ form.fssai_number.label_tag }}
+                        {{ form.fssai_number }}
+                        {% if user.is_verified %}
+                            <p class="form-help-text" style="color: #166534;">✓ Verified & Locked</p>
+                        {% endif %}
+                    </div>
                 </div>
 
                 <div class="image-upload-section">
                     <div class="image-upload-widget">
                         <label>Profile Picture (Logo)</label>
                         <div class="image-preview-container">
-                            <img src="{% if form.instance.profile_picture %}{{ form.instance.profile_picture.url }}{% else %}https://placehold.co/120x120/e2e8f0/475569?text=Logo{% endif %}"
+                            <img src="{% if form.instance.profile_picture %}{{ form.instance.profile_picture.url }}{% else %}data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Crect fill='%23e2e8f0' width='120' height='120'/%3E%3Ctext fill='%23475569' font-family='Arial' font-size='14' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3ELogo%3C/text%3E%3C/svg%3E{% endif %}"
                                 alt="Profile Picture" class="image-preview" id="profile_picture_preview">
                         </div>
                         <input type="file" id="id_profile_picture_input" accept="image/*"
@@ -82,10 +111,7 @@
                 </p>
             </div>
 
-            <div style="margin-top: 2rem; text-align: right; display: flex; gap: 1rem; justify-content: flex-end;">
-                <button type="button" id="edit-profile-btn" onclick="enableEditMode()">Edit Profile</button>
-                <button type="submit" id="save-changes-btn" style="display: none;">Save Changes</button>
-            </div>
+            <div style="display: none;"> <!-- Bottom buttons hidden --> </div>
         </form>
     </div>
 </div>
@@ -201,6 +227,14 @@
         }
 
         setReadOnlyMode();
+
+        // Lock FSSAI if verified
+        const isVerified = "{{ user.is_verified|yesno:'true,false' }}" === "true";
+        const fssaiInput = document.getElementById('id_fssai_number');
+        if (isVerified && fssaiInput) {
+            fssaiInput.setAttribute('disabled', 'disabled'); // Prevent editing even in edit mode
+            fssaiInput.style.opacity = '0.7';
+        }
     });
 </script>
 {% endblock scripts %}
