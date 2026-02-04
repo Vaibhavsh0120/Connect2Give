@@ -515,9 +515,14 @@ class NGORegisterVolunteerForm(forms.Form):
         return username
     
     def clean_aadhar_number(self):
+        from .utils.verification import validate_aadhar_verhoeff
         aadhar = self.cleaned_data.get('aadhar_number', '').strip()
-        if not aadhar.isdigit() or len(aadhar) != 12:
-            raise ValidationError('Aadhar number must be exactly 12 digits.')
+        
+        # Validate using Verhoeff checksum
+        is_valid, error_msg = validate_aadhar_verhoeff(aadhar)
+        if not is_valid:
+            raise ValidationError(error_msg)
+        
         if VolunteerProfile.objects.filter(aadhar_number=aadhar).exists():
             raise ValidationError('This Aadhar number is already registered.')
         return aadhar

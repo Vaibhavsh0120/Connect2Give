@@ -110,18 +110,17 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="id_aadhar_number">
+                        <label>
                             Aadhar Card Number <span class="required">*</span>
                         </label>
-                        <input 
-                            type="text" 
-                            name="aadhar_number" 
-                            id="id_aadhar_number" 
-                            placeholder="123456789012"
-                            value="{{ form.aadhar_number.value|default:'' }}"
-                            required
-                            maxlength="12"
-                        >
+                        <input type="hidden" name="aadhar_number" id="id_aadhar_number" value="{{ form.aadhar_number.value|default:'' }}">
+                        <div class="aadhar-input-group">
+                            <input type="text" class="aadhar-part" maxlength="4" data-index="0" placeholder="1234" inputmode="numeric">
+                            <span class="aadhar-separator">-</span>
+                            <input type="text" class="aadhar-part" maxlength="4" data-index="1" placeholder="5678" inputmode="numeric">
+                            <span class="aadhar-separator">-</span>
+                            <input type="text" class="aadhar-part" maxlength="4" data-index="2" placeholder="9012" inputmode="numeric">
+                        </div>
                         {% if form.aadhar_number.errors %}
                             <p class="field-error">{{ form.aadhar_number.errors.0 }}</p>
                         {% endif %}
@@ -134,10 +133,11 @@
                         <label>Profile Picture (Optional)</label>
                         <div class="profile-upload-container">
                             <div class="profile-preview">
-                                <img src="https://placehold.co/120x120/e2e8f0/475569?text=Photo" alt="Profile Preview" id="profile-preview-img">
+                                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Crect fill='%23e2e8f0' width='120' height='120'/%3E%3Ctext fill='%23475569' font-family='Arial' font-size='12' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3EPhoto%3C/text%3E%3C/svg%3E" alt="Profile Preview" id="profile_picture_preview">
                             </div>
-                            <input type="file" name="profile_picture" id="id_profile_picture" accept="image/*" style="display: none;">
-                            <button type="button" class="btn-upload" onclick="document.getElementById('id_profile_picture').click()">
+                            <input type="file" id="id_profile_picture_input" accept="image/*" onchange="modernCropperOpen(event, 1, 'id_profile_picture')" style="display: none;">
+                            <input type="hidden" name="profile_picture" id="id_profile_picture">
+                            <button type="button" class="btn-upload" onclick="document.getElementById('id_profile_picture_input').click()">
                                 Choose Photo
                             </button>
                         </div>
@@ -147,31 +147,31 @@
                         <label>Skills</label>
                         <div class="skills-checkbox-group">
                             <label class="skill-checkbox-item">
-                                <input type="checkbox" name="skills" value="driving">
+                                <input type="checkbox" name="skills" value="driving" {% if 'driving' in form.skills.value %}checked{% endif %}>
                                 <span class="skill-label">Driving</span>
                             </label>
                             <label class="skill-checkbox-item">
-                                <input type="checkbox" name="skills" value="first_aid">
+                                <input type="checkbox" name="skills" value="first_aid" {% if 'first_aid' in form.skills.value %}checked{% endif %}>
                                 <span class="skill-label">First Aid</span>
                             </label>
                             <label class="skill-checkbox-item">
-                                <input type="checkbox" name="skills" value="cooking">
+                                <input type="checkbox" name="skills" value="cooking" {% if 'cooking' in form.skills.value %}checked{% endif %}>
                                 <span class="skill-label">Cooking</span>
                             </label>
                             <label class="skill-checkbox-item">
-                                <input type="checkbox" name="skills" value="logistics">
+                                <input type="checkbox" name="skills" value="logistics" {% if 'logistics' in form.skills.value %}checked{% endif %}>
                                 <span class="skill-label">Logistics</span>
                             </label>
                             <label class="skill-checkbox-item">
-                                <input type="checkbox" name="skills" value="communication">
+                                <input type="checkbox" name="skills" value="communication" {% if 'communication' in form.skills.value %}checked{% endif %}>
                                 <span class="skill-label">Communication</span>
                             </label>
                             <label class="skill-checkbox-item">
-                                <input type="checkbox" name="skills" value="medical">
+                                <input type="checkbox" name="skills" value="medical" {% if 'medical' in form.skills.value %}checked{% endif %}>
                                 <span class="skill-label">Medical</span>
                             </label>
                             <label class="skill-checkbox-item">
-                                <input type="checkbox" name="skills" value="packaging">
+                                <input type="checkbox" name="skills" value="packaging" {% if 'packaging' in form.skills.value %}checked{% endif %}>
                                 <span class="skill-label">Packaging</span>
                             </label>
                         </div>
@@ -226,6 +226,8 @@
         </div>
     </div>
 </div>
+
+{% include 'components/image_cropper_modal.html' %}
 
 <style>
     .register-volunteer-page {
@@ -564,21 +566,127 @@
             gap: 1rem;
         }
     }
+
+    /* Aadhar Card Special Input */
+    .aadhar-input-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .aadhar-part {
+        width: 90px;
+        text-align: center;
+        font-size: 1.25rem;
+        font-weight: 600;
+        letter-spacing: 3px;
+        padding: 0.75rem;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg-input, white);
+        transition: all 0.2s ease;
+    }
+
+    .aadhar-part:focus {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 3px rgba(0, 173, 181, 0.15);
+        outline: none;
+    }
+
+    .aadhar-part::placeholder {
+        color: #cbd5e1;
+        font-weight: 400;
+        letter-spacing: 2px;
+    }
+
+    .aadhar-separator {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-muted, #94a3b8);
+    }
+
+    @media (max-width: 768px) {
+        .aadhar-part {
+            width: 70px;
+            font-size: 1rem;
+            padding: 0.5rem;
+        }
+        .aadhar-separator {
+            font-size: 1.25rem;
+        }
+    }
 </style>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Profile picture preview
-    document.getElementById('id_profile_picture').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                document.getElementById('profile-preview-img').src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
+    // --- AADHAR CARD 3-BOX INPUT LOGIC ---
+    const aadharHidden = document.getElementById('id_aadhar_number');
+    const aadharParts = document.querySelectorAll('.aadhar-part');
+    
+    function updateHiddenAadhar() {
+        const part1 = aadharParts[0].value;
+        const part2 = aadharParts[1].value;
+        const part3 = aadharParts[2].value;
+        aadharHidden.value = `${part1}${part2}${part3}`;
+    }
+    
+    // Initialize from hidden field if exists
+    if (aadharHidden.value) {
+        const val = aadharHidden.value.replace(/\D/g, '');
+        if (val.length > 0) aadharParts[0].value = val.slice(0, 4);
+        if (val.length > 4) aadharParts[1].value = val.slice(4, 8);
+        if (val.length > 8) aadharParts[2].value = val.slice(8, 12);
+    }
+    
+    aadharParts.forEach((input, idx) => {
+        // Allow numbers only + auto-advance
+        input.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '');
+            
+            // Auto-advance to next box when full
+            if (e.target.value.length === 4 && idx < 2) {
+                aadharParts[idx + 1].focus();
+            }
+            updateHiddenAadhar();
+        });
+        
+        // Handle Backspace - move to previous box when empty
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && e.target.value.length === 0 && idx > 0) {
+                e.preventDefault();
+                const prev = aadharParts[idx - 1];
+                prev.focus();
+                prev.setSelectionRange(prev.value.length, prev.value.length);
+            }
+        });
+        
+        // Handle Paste - intelligently distribute across boxes
+        input.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const pasteData = (e.clipboardData || window.clipboardData).getData('text');
+            // Remove all non-digits and spaces
+            const cleanData = pasteData.replace(/[\D\s]/g, '').slice(0, 12);
+            
+            if (cleanData) {
+                aadharParts[0].value = cleanData.slice(0, 4);
+                aadharParts[1].value = cleanData.slice(4, 8);
+                aadharParts[2].value = cleanData.slice(8, 12);
+                
+                // Focus logic after paste
+                if (cleanData.length >= 12) {
+                    aadharParts[2].focus();
+                } else if (cleanData.length > 8) {
+                    aadharParts[2].focus();
+                } else if (cleanData.length > 4) {
+                    aadharParts[1].focus();
+                } else {
+                    aadharParts[0].focus();
+                }
+                
+                updateHiddenAadhar();
+            }
+        });
     });
 
     // Initialize map

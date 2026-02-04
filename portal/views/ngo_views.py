@@ -14,7 +14,7 @@ import socket  # Imported to help catch network errors
 from ..models import DonationCamp, Donation, NGOProfile, VolunteerProfile, User, NGOVolunteer
 from ..forms import DonationCampForm, NGOProfileForm, NGORegisterVolunteerForm
 from ..decorators import user_type_required
-from ..utils.verification import validate_ngo_darpan_format
+from ..utils.verification import validate_ngo_darpan_format, verify_email_deliverable
 
 @login_required(login_url='login_page')
 @user_type_required('NGO')
@@ -143,69 +143,77 @@ def ngo_register_volunteer(request):
         form = NGORegisterVolunteerForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                # TRANSACTION BLOCK: All or Nothing
-                with transaction.atomic():
-                    # 1. Generate Creds
-                    temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
-                    username = form.cleaned_data['username']
-                    
-                    # 2. Create User
-                    user = User.objects.create_user(
-                        username=username,
-                        email=form.cleaned_data['email'],
-                        password=temp_password,
-                        user_type=User.UserType.VOLUNTEER,
-                        first_name=form.cleaned_data['full_name'].split(' ')[0],
-                        last_name=' '.join(form.cleaned_data['full_name'].split(' ')[1:]),
-                        must_change_password=True
-                    )
-                    
-                    # 3. Create Profile
-                    volunteer_profile = VolunteerProfile.objects.create(
-                        user=user,
-                        full_name=form.cleaned_data['full_name'],
-                        email=form.cleaned_data['email'],
-                        phone_number=form.cleaned_data['phone_number'],
-                        aadhar_number=form.cleaned_data['aadhar_number'],
-                        skills=form.cleaned_data.get('skills', ''),
-                        address=form.cleaned_data.get('address', ''),
-                        latitude=form.cleaned_data.get('latitude'),
-                        longitude=form.cleaned_data.get('longitude'),
-                        registered_ngo=ngo_profile
-                    )
-                    
-                    # 4. Handle Image
-                    if form.cleaned_data.get('profile_picture'):
-                        volunteer_profile.profile_picture = form.cleaned_data['profile_picture']
-                        volunteer_profile.save()
-                    
-                    # 5. Link to NGO
-                    NGOVolunteer.objects.create(ngo=ngo_profile, volunteer=volunteer_profile)
-                    
-                    # 6. Send Email
-                    subject = f'Welcome to Connect2Give - Your Account Details'
-                    context = {
-                        'volunteer_name': form.cleaned_data['full_name'],
-                        'username': username,
-                        'temp_password': temp_password,
-                        'ngo_name': ngo_profile.ngo_name,
-                        'login_url': request.build_absolute_uri('/login/'),
-                    }
-                    html_message = render_to_string('emails/volunteer_invitation.html', context)
-                    plain_message = strip_tags(html_message)
-                    
-                    send_mail(
-                        subject,
-                        plain_message,
-                        settings.DEFAULT_FROM_EMAIL,
-                        [form.cleaned_data['email']],
-                        html_message=html_message,
-                        fail_silently=False, 
-                    )
+                # Verify email is deliverable BEFORE creating user
+                email = form.cleaned_data['email']
+                is_email_valid, email_error = verify_email_deliverable(email)
                 
-                # Success
-                messages.success(request, f'Volunteer {form.cleaned_data["full_name"]} registered successfully! Invitation email sent.')
-                return redirect('ngo_register_volunteer')
+                if not is_email_valid:
+                    error_popup = f"Email Verification Failed: {email_error}"
+                    form = NGORegisterVolunteerForm(request.POST, request.FILES)
+                else:
+                    # TRANSACTION BLOCK: All or Nothing
+                    with transaction.atomic():
+                        # 1. Generate Creds
+                        temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+                        username = form.cleaned_data['username']
+                    
+                        # 2. Create User
+                        user = User.objects.create_user(
+                            username=username,
+                            email=form.cleaned_data['email'],
+                            password=temp_password,
+                            user_type=User.UserType.VOLUNTEER,
+                            first_name=form.cleaned_data['full_name'].split(' ')[0],
+                            last_name=' '.join(form.cleaned_data['full_name'].split(' ')[1:]),
+                            must_change_password=True
+                        )
+                        
+                        # 3. Create Profile
+                        volunteer_profile = VolunteerProfile.objects.create(
+                            user=user,
+                            full_name=form.cleaned_data['full_name'],
+                            email=form.cleaned_data['email'],
+                            phone_number=form.cleaned_data['phone_number'],
+                            aadhar_number=form.cleaned_data['aadhar_number'],
+                            skills=form.cleaned_data.get('skills', ''),
+                            address=form.cleaned_data.get('address', ''),
+                            latitude=form.cleaned_data.get('latitude'),
+                            longitude=form.cleaned_data.get('longitude'),
+                            registered_ngo=ngo_profile
+                        )
+                        
+                        # 4. Handle Image
+                        if form.cleaned_data.get('profile_picture'):
+                            volunteer_profile.profile_picture = form.cleaned_data['profile_picture']
+                            volunteer_profile.save()
+                        
+                        # 5. Link to NGO
+                        NGOVolunteer.objects.create(ngo=ngo_profile, volunteer=volunteer_profile)
+                        
+                        # 6. Send Email
+                        subject = f'Welcome to Connect2Give - Your Account Details'
+                        context = {
+                            'volunteer_name': form.cleaned_data['full_name'],
+                            'username': username,
+                            'temp_password': temp_password,
+                            'ngo_name': ngo_profile.ngo_name,
+                            'login_url': request.build_absolute_uri('/login/'),
+                        }
+                        html_message = render_to_string('emails/volunteer_invitation.html', context)
+                        plain_message = strip_tags(html_message)
+                        
+                        send_mail(
+                            subject,
+                            plain_message,
+                            settings.DEFAULT_FROM_EMAIL,
+                            [form.cleaned_data['email']],
+                            html_message=html_message,
+                            fail_silently=False, 
+                        )
+                    
+                    # Success
+                    messages.success(request, f'Volunteer {form.cleaned_data["full_name"]} registered successfully! Invitation email sent.')
+                    return redirect('ngo_register_volunteer')
                 
             except Exception as e:
                 # DB has rolled back automatically. Now assume friendly error.

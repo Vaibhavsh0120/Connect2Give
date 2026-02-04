@@ -6,34 +6,133 @@
 {% block page_title %}Dashboard Overview{% endblock %}
 {% block page_description %}A summary of your donation activity.{% endblock %}
 
+{% block head %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/dashboard_common.css' %}">
+{% endblock %}
+
 {% block restaurant_content %}
+    <!-- Alert for Pending Pickups -->
+    {% if stats.pending_donations > 0 %}
+    <div class="alerts-card">
+        <div class="alert-icon">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        </div>
+        <div class="alert-content">
+            <div class="alert-title">{{ stats.pending_donations }} Donations Awaiting Pickup</div>
+            <div class="alert-desc">Volunteers will arrive soon to collect</div>
+        </div>
+        <a href="{% url 'restaurant_my_donations' %}" class="alert-action">View All</a>
+    </div>
+    {% endif %}
+
+    <!-- Stat Cards -->
     <div class="stats-grid">
-        <div class="stat-card">
-            <h3>Total Donations</h3>
-            <p class="stat-number">{{ stats.total_donations|default:"0" }}</p>
+        <div class="stat-card" style="--stat-accent: #10b981;">
+            <div class="stat-icon success">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            </div>
+            <div class="stat-content">
+                <h3>Total Donations</h3>
+                <p class="stat-number">{{ stats.total_donations|default:"0" }}</p>
+            </div>
         </div>
-        <div class="stat-card">
-            <h3>Pending Pickup</h3>
-            <p class="stat-number">{{ stats.pending_donations|default:"0" }}</p>
+        <div class="stat-card" style="--stat-accent: #f59e0b;">
+            <div class="stat-icon warning">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div class="stat-content">
+                <h3>Pending Pickup</h3>
+                <p class="stat-number">{{ stats.pending_donations|default:"0" }}</p>
+            </div>
         </div>
-        <div class="stat-card">
-            <h3>Active Deliveries</h3>
-            <p class="stat-number">{{ stats.active_donations|default:"0" }}</p>
+        <div class="stat-card" style="--stat-accent: #3b82f6;">
+            <div class="stat-icon info">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+            </div>
+            <div class="stat-content">
+                <h3>Active Deliveries</h3>
+                <p class="stat-number">{{ stats.active_donations|default:"0" }}</p>
+            </div>
         </div>
-        <div class="stat-card">
-            <h3>Completed</h3>
-            <p class="stat-number">{{ stats.completed_donations|default:"0" }}</p>
+        <div class="stat-card" style="--stat-accent: #8b5cf6;">
+            <div class="stat-icon purple">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div class="stat-content">
+                <h3>Completed</h3>
+                <p class="stat-number">{{ stats.completed_donations|default:"0" }}</p>
+            </div>
         </div>
     </div>
 
-    <div class="dashboard-grid">
-        <div class="content-card">
-            <h3>Nearby Active Donation Camps</h3>
-            <div id="dashboard-map"></div>
+    <!-- Quick Actions -->
+    <div class="quick-actions-section">
+        <h3>Quick Actions</h3>
+        <div class="quick-actions-grid">
+            <a href="{% url 'restaurant_new_donation' %}" class="quick-action-card">
+                <span class="action-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></span>
+                <span class="action-label">New Donation</span>
+            </a>
+            <a href="{% url 'restaurant_my_donations' %}" class="quick-action-card">
+                <span class="action-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></span>
+                <span class="action-label">My Donations</span>
+            </a>
+            <a href="{% url 'restaurant_profile' %}" class="quick-action-card">
+                <span class="action-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></span>
+                <span class="action-label">Edit Profile</span>
+            </a>
+            <a href="{% url 'restaurant_my_donations' %}?status=completed" class="quick-action-card">
+                <span class="action-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></span>
+                <span class="action-label">View History</span>
+            </a>
         </div>
-        <div class="content-card">
+    </div>
+
+    <!-- Dashboard Grid -->
+    <div class="dashboard-grid">
+        <!-- Map Card -->
+        <div class="map-card">
+            <h3>Nearby Active Donation Camps</h3>
+            <div id="dashboard-map" class="dashboard-map"></div>
+        </div>
+        
+        <!-- Chart Card -->
+        <div class="chart-card">
             <h3>Monthly Donations</h3>
             <canvas id="donationsChart" class="chart-canvas"></canvas>
+        </div>
+    </div>
+
+    <!-- Recent Donations -->
+    <div class="activity-card">
+        <h3>Recent Donations</h3>
+        <div class="activity-list">
+            {% if recent_donations %}
+                {% for donation in recent_donations %}
+                <div class="activity-item">
+                    <div class="activity-icon-wrapper {% if donation.status == 'COMPLETED' %}green{% elif donation.status == 'PENDING' %}yellow{% else %}blue{% endif %}">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    </div>
+                    <div class="activity-details">
+                        <div class="activity-title">{{ donation.food_name }}</div>
+                        <div class="activity-desc">{{ donation.quantity }} • {{ donation.get_status_display }}</div>
+                        <div class="activity-time">{{ donation.created_at|timesince }} ago</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="activity-item">
+                    <div class="activity-icon-wrapper green">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </div>
+                    <div class="activity-details">
+                        <div class="activity-title">Ready to donate?</div>
+                        <div class="activity-desc">Start by creating your first donation</div>
+                        <div class="activity-time">Click "New Donation" above</div>
+                    </div>
+                </div>
+            {% endif %}
         </div>
     </div>
 {% endblock restaurant_content %}
@@ -52,14 +151,15 @@
 
             const camps = JSON.parse('{{ camps_map_data|safe }}');
             
-            const campIcon = L.icon({
-                iconUrl: 'https://placehold.co/38x38/10b981/FFFFFF?text=C',
-                iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -38]
-            });
-
             camps.forEach(camp => {
-                L.marker([camp.lat, camp.lon], { icon: campIcon }).addTo(map)
-                 .bindPopup(`<b>Camp: ${camp.name}</b><br>NGO: ${camp.ngo}<br>Address: ${camp.address}`);
+                const marker = L.circleMarker([camp.lat, camp.lon], {
+                    radius: 10,
+                    fillColor: '#10b981',
+                    color: '#fff',
+                    weight: 2,
+                    fillOpacity: 0.9
+                }).addTo(map);
+                marker.bindPopup(`<b>Camp: ${camp.name}</b><br>NGO: ${camp.ngo}<br>Address: ${camp.address}`);
             });
 
 
@@ -75,7 +175,7 @@
                         backgroundColor: 'rgba(16, 185, 129, 0.2)',
                         borderColor: '#10b981',
                         borderWidth: 2,
-                        borderRadius: 5,
+                        borderRadius: 8,
                     }]
                 },
                 options: {
@@ -83,7 +183,7 @@
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: '#e2e8f0' } },
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
                         x: { grid: { display: false } }
                     }
                 }

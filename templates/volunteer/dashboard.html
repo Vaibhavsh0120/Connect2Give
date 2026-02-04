@@ -8,90 +8,163 @@
 
 {% block head %}
     {{ block.super }}
-    <link rel="stylesheet" href="{% static 'css/dashboard_enhancements.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard_common.css' %}">
 {% endblock %}
 
 {% block volunteer_content %}
-    <div class="stats-grid">
-        <div class="stat-card">
-            <h3>Active Pickups</h3>
-            <p class="stat-number">{{ stats.active_pickups|default:"0" }}</p>
+    <!-- Alert for Active Pickups -->
+    {% if stats.active_pickups > 0 %}
+    <div class="alerts-card">
+        <div class="alert-icon">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
         </div>
-        <div class="stat-card">
-            <h3>Completed Deliveries</h3>
-            <p class="stat-number">{{ stats.completed_deliveries|default:"0" }}</p>
+        <div class="alert-content">
+            <div class="alert-title">{{ stats.active_pickups }} Active Pickup(s) in Progress</div>
+            <div class="alert-desc">Complete your deliveries to help those in need</div>
         </div>
-        <div class="stat-card">
-            <h3>Registered NGOs</h3>
-            <p class="stat-number">{{ stats.registered_ngos|default:"0" }}</p>
-        </div>
-        <div class="stat-card">
-            <h3>Available Donations</h3>
-            <p class="stat-number">{{ stats.available_donations|default:"0" }}</p>
-        </div>
-    </div>
-
-    <div class="recent-activity-card">
-        <h3>🚀 Quick Actions</h3>
-        <div class="quick-actions">
-            <a href="{% url 'volunteer_manage_pickups' %}" class="quick-action-btn">
-                <span class="quick-action-icon">📦</span>
-                <span class="quick-action-label">View Donations</span>
-            </a>
-            <a href="{% url 'volunteer_profile' %}" class="quick-action-btn">
-                <span class="quick-action-icon">👤</span>
-                <span class="quick-action-label">Update Profile</span>
-            </a>
-            <a href="{% url 'volunteer_manage_pickups' %}?view=delivery_route" class="quick-action-btn">
-                <span class="quick-action-icon">🗺️</span>
-                <span class="quick-action-label">Plan Route</span>
-            </a>
-        </div>
-    </div>
-
-    {% if not is_subscribed_to_notifications %}
-    <div class="recent-activity-card" id="notification-card">
-        <h3>🔔 Push Notifications</h3>
-        <p style="color: var(--text-muted); margin-bottom: 1rem;">Get instant notifications when new donations are posted!</p>
-        <button id="enableNotifications" onclick="requestNotificationPermission()" class="quick-action-btn" style="width: auto; padding: 0.75rem 1.5rem; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
-            <span class="quick-action-icon">🔔</span>
-            <span class="quick-action-label">Enable Notifications</span>
-        </button>
-        <div id="notificationStatus" style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.875rem;"></div>
+        <a href="{% url 'volunteer_manage_pickups' %}" class="alert-action">View Pickups</a>
     </div>
     {% endif %}
 
-    <div class="activity-feed">
-        <h3>📊 Recent Activity</h3>
-        {% if stats.completed_deliveries > 0 or stats.active_pickups > 0 %}
-            <div class="activity-item">
-                <strong>🎉 Great work!</strong> You've completed {{ stats.completed_deliveries }} deliveries.
-                <div class="activity-time">Keep up the amazing work</div>
+    <!-- Stat Cards -->
+    <div class="stats-grid">
+        <div class="stat-card" style="--stat-accent: #3b82f6;">
+            <div class="stat-icon info">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
             </div>
-            {% if stats.active_pickups > 0 %}
-            <div class="activity-item">
-                <strong>⏰ Active Pickups</strong> You have {{ stats.active_pickups }} active pickup(s) to deliver.
-                <div class="activity-time">Don't forget to complete them!</div>
+            <div class="stat-content">
+                <h3>Active Pickups</h3>
+                <p class="stat-number">{{ stats.active_pickups|default:"0" }}</p>
             </div>
-            {% endif %}
-            {% if stats.available_donations > 0 %}
-            <div class="activity-item">
-                <strong>📦 New Donations</strong> {{ stats.available_donations }} donation(s) available for pickup.
-                <div class="activity-time">Check the pickups page</div>
+        </div>
+        <div class="stat-card" style="--stat-accent: #10b981;">
+            <div class="stat-icon success">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
-            {% endif %}
-        {% else %}
-            <div class="empty-state">
-                <div class="empty-state-icon">📭</div>
-                <p>No activity yet</p>
-                <a href="{% url 'volunteer_manage_pickups' %}" class="btn">Start by accepting a donation</a>
+            <div class="stat-content">
+                <h3>Completed Deliveries</h3>
+                <p class="stat-number">{{ stats.completed_deliveries|default:"0" }}</p>
             </div>
-        {% endif %}
+        </div>
+        <div class="stat-card" style="--stat-accent: #8b5cf6;">
+            <div class="stat-icon purple">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            </div>
+            <div class="stat-content">
+                <h3>Registered NGOs</h3>
+                <p class="stat-number">{{ stats.registered_ngos|default:"0" }}</p>
+            </div>
+        </div>
+        <div class="stat-card" style="--stat-accent: #f59e0b;">
+            <div class="stat-icon warning">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            </div>
+            <div class="stat-content">
+                <h3>Available Donations</h3>
+                <p class="stat-number">{{ stats.available_donations|default:"0" }}</p>
+            </div>
+        </div>
     </div>
 
-    <div class="content-card">
-        <h3>🗺️ Nearby Donations and Camps</h3>
-        <div id="dashboard-map"></div>
+    <!-- Quick Actions -->
+    <div class="quick-actions-section">
+        <h3>Quick Actions</h3>
+        <div class="quick-actions-grid">
+            <a href="{% url 'volunteer_manage_pickups' %}" class="quick-action-card">
+                <span class="action-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></span>
+                <span class="action-label">View Donations</span>
+            </a>
+            <a href="{% url 'volunteer_manage_pickups' %}?view=my_pickups" class="quick-action-card">
+                <span class="action-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg></span>
+                <span class="action-label">My Pickups</span>
+            </a>
+            <a href="{% url 'volunteer_manage_pickups' %}?view=delivery_route" class="quick-action-card">
+                <span class="action-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg></span>
+                <span class="action-label">Plan Route</span>
+            </a>
+            <a href="{% url 'volunteer_profile' %}" class="quick-action-card">
+                <span class="action-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></span>
+                <span class="action-label">My Profile</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Push Notifications Card -->
+    {% if not is_subscribed_to_notifications %}
+    <div class="quick-actions-section" id="notification-card" style="background: #fffbeb; border-color: #fcd34d;">
+        <h3 style="color: #92400e;">Enable Push Notifications</h3>
+        <p style="color: #a16207; margin-bottom: 1rem;">Get instant alerts when new donations are posted nearby.</p>
+        <button id="enableNotifications" onclick="requestNotificationPermission()" 
+            style="background: #f59e0b; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; 
+            cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            <span>Enable Notifications</span>
+        </button>
+        <div id="notificationStatus" style="margin-top: 0.5rem; color: #a16207; font-size: 0.875rem;"></div>
+    </div>
+    {% endif %}
+
+    <!-- Dashboard Grid -->
+    <div class="dashboard-grid">
+        <!-- Map Card -->
+        <div class="map-card">
+            <h3>Nearby Donations & Camps</h3>
+            <div id="dashboard-map" class="dashboard-map"></div>
+        </div>
+
+        <!-- Activity Feed -->
+        <div class="activity-card">
+            <h3>Your Activity</h3>
+            <div class="activity-list">
+                {% if stats.completed_deliveries > 0 or stats.active_pickups > 0 %}
+                    <div class="activity-item">
+                        <div class="activity-icon-wrapper green">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div class="activity-details">
+                            <div class="activity-title">Great work!</div>
+                            <div class="activity-desc">You've completed {{ stats.completed_deliveries }} deliveries</div>
+                            <div class="activity-time">Keep up the amazing work</div>
+                        </div>
+                    </div>
+                    {% if stats.active_pickups > 0 %}
+                    <div class="activity-item">
+                        <div class="activity-icon-wrapper yellow">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div class="activity-details">
+                            <div class="activity-title">Active Pickups</div>
+                            <div class="activity-desc">You have {{ stats.active_pickups }} active pickup(s) to deliver</div>
+                            <div class="activity-time">Don't forget to complete them</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if stats.available_donations > 0 %}
+                    <div class="activity-item">
+                        <div class="activity-icon-wrapper blue">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        </div>
+                        <div class="activity-details">
+                            <div class="activity-title">New Donations Available</div>
+                            <div class="activity-desc">{{ stats.available_donations }} donation(s) ready for pickup</div>
+                            <div class="activity-time">Check the donations page</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity: 0.5;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                        </div>
+                        <p>No activity yet</p>
+                        <a href="{% url 'volunteer_manage_pickups' %}" class="btn" 
+                            style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none;">
+                            Start by accepting a donation
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
 {% endblock volunteer_content %}
 
@@ -109,25 +182,27 @@
 
             const donations = JSON.parse('{{ donations_map_data|safe }}');
             const camps = JSON.parse('{{ camps_map_data|safe }}');
-            
-            const restaurantIcon = L.icon({
-                iconUrl: 'https://placehold.co/38x38/3b82f6/FFFFFF?text=R',
-                iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -38]
-            });
-
-            const campIcon = L.icon({
-                iconUrl: 'https://placehold.co/38x38/10b981/FFFFFF?text=C',
-                iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -38]
-            });
 
             donations.forEach(donation => {
-                L.marker([donation.lat, donation.lon], { icon: restaurantIcon }).addTo(map)
-                 .bindPopup(`<b>${donation.name}</b><br>${donation.food}<br><a href="/donation/accept/${donation.id}/">Accept</a>`);
+                const marker = L.circleMarker([donation.lat, donation.lon], {
+                    radius: 10,
+                    fillColor: '#3b82f6',
+                    color: '#fff',
+                    weight: 2,
+                    fillOpacity: 0.9
+                }).addTo(map);
+                marker.bindPopup(`<b>${donation.name}</b><br>${donation.food}<br><a href="/donation/accept/${donation.id}/">Accept</a>`);
             });
 
             camps.forEach(camp => {
-                L.marker([camp.lat, camp.lon], { icon: campIcon }).addTo(map)
-                 .bindPopup(`<b>Camp: ${camp.name}</b><br>NGO: ${camp.ngo}<br>Address: ${camp.address}`);
+                const marker = L.circleMarker([camp.lat, camp.lon], {
+                    radius: 10,
+                    fillColor: '#10b981',
+                    color: '#fff',
+                    weight: 2,
+                    fillOpacity: 0.9
+                }).addTo(map);
+                marker.bindPopup(`<b>Camp: ${camp.name}</b><br>NGO: ${camp.ngo}<br>Address: ${camp.address}`);
             });
         });
     </script>
@@ -135,49 +210,37 @@
     <script>
         const VAPID_PUBLIC_KEY = '{{ WEBPUSH_SETTINGS.VAPID_PUBLIC_KEY }}';
         
-        // Convert base64 string to Uint8Array
         function urlBase64ToUint8Array(base64String) {
             const padding = '='.repeat((4 - base64String.length % 4) % 4);
-            const base64 = (base64String + padding)
-                .replace(/\-/g, '+')
-                .replace(/_/g, '/');
-            
+            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
             const rawData = window.atob(base64);
             const outputArray = new Uint8Array(rawData.length);
-            
             for (let i = 0; i < rawData.length; ++i) {
                 outputArray[i] = rawData.charCodeAt(i);
             }
             return outputArray;
         }
         
-        // Request notification permission and subscribe
         async function requestNotificationPermission() {
             const statusEl = document.getElementById('notificationStatus');
             const button = document.getElementById('enableNotifications');
             
-            if (!('serviceWorker' in navigator)) {
-                statusEl.textContent = '❌ Service workers are not supported in your browser';
-                return;
-            }
-            
-            if (!('PushManager' in window)) {
-                statusEl.textContent = '❌ Push notifications are not supported in your browser';
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                statusEl.textContent = 'Push notifications are not supported';
                 return;
             }
             
             try {
                 const permission = await Notification.requestPermission();
                 if (permission !== 'granted') {
-                    statusEl.textContent = '❌ Notification permission denied';
+                    statusEl.textContent = 'Notification permission denied';
                     return;
                 }
                 
                 button.disabled = true;
-                button.querySelector('.quick-action-label').textContent = 'Subscribing...';
+                button.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg><span>Subscribing...</span>';
                 
                 const registration = await navigator.serviceWorker.register('/sw.js');
-                
                 await navigator.serviceWorker.ready;
                 
                 const subscription = await registration.pushManager.subscribe({
@@ -194,56 +257,35 @@
                     body: JSON.stringify(subscription.toJSON())
                 });
                 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Server returned an error.');
-                }
-
+                if (!response.ok) throw new Error('Server error');
                 const data = await response.json();
                 
                 if (data.success) {
-                    // --- THIS IS THE UPDATED CODE ---
-                    const notificationCard = document.getElementById('notification-card');
-                    if (notificationCard) {
-                        notificationCard.style.transition = 'opacity 0.5s ease, height 0.5s ease, margin 0.5s ease, padding 0.5s ease';
-                        notificationCard.style.opacity = '0';
-                        // Collapse the element for a smooth transition
-                        notificationCard.style.height = '0';
-                        notificationCard.style.margin = '0';
-                        notificationCard.style.padding = '0';
-                        notificationCard.style.border = 'none';
-                        // Remove the element from the DOM after the animation
-                        setTimeout(() => notificationCard.remove(), 500);
+                    const card = document.getElementById('notification-card');
+                    if (card) {
+                        card.style.transition = 'all 0.5s ease';
+                        card.style.opacity = '0';
+                        card.style.transform = 'translateY(-10px)';
+                        setTimeout(() => card.remove(), 500);
                     }
-                    showToast('Push notifications enabled successfully!', 'success');
-                    // --- END OF UPDATE ---
-                } else {
-                    throw new Error(data.message);
+                    showToast('Push notifications enabled!', 'success');
                 }
             } catch (error) {
-                console.error('Error enabling notifications:', error);
-                statusEl.textContent = '❌ Failed to enable notifications: ' + error.message;
-                statusEl.style.color = 'var(--error-red)';
+                console.error('Error:', error);
+                statusEl.textContent = 'Failed: ' + error.message;
                 button.disabled = false;
-                button.querySelector('.quick-action-label').textContent = 'Enable Notifications';
-                showToast('Failed to enable notifications', 'error');
+                button.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg><span>Enable Notifications</span>';
             }
         }
         
-        // Check if notifications are already enabled
         document.addEventListener('DOMContentLoaded', async function() {
-            const statusEl = document.getElementById('notificationStatus');
-            const button = document.getElementById('enableNotifications');
-            
             if ('serviceWorker' in navigator && 'PushManager' in window) {
                 const registration = await navigator.serviceWorker.getRegistration();
                 if (registration) {
                     const subscription = await registration.pushManager.getSubscription();
                     if (subscription) {
-                        const notificationCard = document.getElementById('notification-card');
-                        if (notificationCard) {
-                            notificationCard.remove();
-                        }
+                        const card = document.getElementById('notification-card');
+                        if (card) card.remove();
                     }
                 }
             }
