@@ -1,4 +1,5 @@
 {% extends 'volunteer/base.html' %}
+{% load static %}
 
 {% block title %}My Profile - {{ block.super }}{% endblock %}
 
@@ -7,9 +8,116 @@
 
 {% block volunteer_content %}
 <style>
-    /* Skills display styles */
-    .skills-display-container {
-        margin-top: 0.5rem;
+    .profile-header-card {
+        background: var(--bg-card, white);
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: var(--radius, 0.75rem);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+    }
+    
+    .logo-container {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 3px solid var(--border, #e2e8f0);
+        background: var(--bg-card, #f8f9fa);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        position: relative;
+        flex-shrink: 0;
+    }
+    
+    .logo-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .logo-upload-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0,0,0,0.6);
+        color: white;
+        text-align: center;
+        padding: 0.25rem;
+        font-size: 0.7rem;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    
+    .logo-container:hover .logo-upload-overlay {
+        opacity: 1;
+    }
+    
+    body.edit-mode .logo-upload-overlay {
+        display: block;
+    }
+    
+    .profile-info {
+        flex: 1;
+    }
+    
+    .profile-name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary, #1a1a2e);
+        margin: 0 0 0.25rem 0;
+    }
+    
+    .profile-username {
+        color: var(--text-muted, #6c757d);
+        font-size: 0.9rem;
+    }
+    
+    .header-actions {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+    
+    .form-section {
+        background: var(--bg-card, white);
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: var(--radius, 0.75rem);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-section h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-primary, #1a1a2e);
+        margin: 0 0 1.25rem 0;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border, #e2e8f0);
+    }
+    
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    
+    .aadhar-input-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .aadhar-part {
+        width: 80px;
+        text-align: center;
+        letter-spacing: 2px;
+    }
+    .separator {
+        font-weight: bold;
+        color: #cbd5e1;
     }
     
     .skills-badges {
@@ -30,27 +138,14 @@
         font-weight: 500;
     }
     
-    .skill-badge .check-icon {
-        width: 14px;
-        height: 14px;
-        color: var(--accent-green, #28a745);
-    }
-    
-    .no-skills-text {
-        color: var(--text-muted, #6c757d);
-        font-style: italic;
-    }
-    
-    /* Skills edit mode */
-    .skills-edit-container {
-        display: none;
-    }
-    
     .skills-checkbox-group {
-        display: flex;
+        display: none;
         flex-wrap: wrap;
         gap: 0.75rem;
     }
+    
+    body.edit-mode .skills-badges { display: none; }
+    body.edit-mode .skills-checkbox-group { display: flex; }
     
     .skill-checkbox-item {
         display: flex;
@@ -64,216 +159,171 @@
         transition: all 0.2s;
     }
     
-    .skill-checkbox-item:hover {
-        border-color: var(--accent-primary, #00adb5);
-    }
-    
-    .skill-checkbox-item input[type="checkbox"] {
-        width: auto;
-        margin: 0;
-    }
-    
-    .skill-checkbox-item input[type="checkbox"]:checked + .skill-label {
-        color: var(--accent-primary, #00adb5);
-        font-weight: 600;
-    }
-    
     .skill-checkbox-item:has(input:checked) {
         background: var(--accent-primary-light, rgba(0, 173, 181, 0.1));
         border-color: var(--accent-primary, #00adb5);
     }
     
-    .skill-label {
-        font-size: 0.875rem;
-    }
-    
-    /* Edit mode active state */
-    body.edit-mode .skills-display-container {
-        display: none;
-    }
-    
-    body.edit-mode .skills-edit-container {
-        display: block;
+    @media (max-width: 768px) {
+        .form-row { grid-template-columns: 1fr; }
+        .profile-header-card {
+            flex-direction: column;
+            text-align: center;
+        }
+        .header-actions { justify-content: center; }
     }
 </style>
 
-<div class="profile-container">
-    <div class="profile-form">
-        <form method="POST" enctype="multipart/form-data" action="{% url 'volunteer_profile' %}" id="profile-form">
-            <div class="profile-header-actions" style="margin-bottom: 2rem; text-align: right; display: flex; justify-content: flex-end; gap: 1rem;">
-                <button type="button" id="edit-profile-btn" onclick="enableEditMode()">Edit Profile</button>
-                <button type="submit" id="save-changes-btn" style="display: none;">Save Changes</button>
+<form method="POST" enctype="multipart/form-data" action="{% url 'volunteer_profile' %}" id="profile-form">
+    {% csrf_token %}
+    {{ form.latitude }}
+    {{ form.longitude }}
+    
+    <!-- Profile Header Card -->
+    <div class="profile-header-card">
+        <div class="logo-container">
+            <img src="{% if form.instance.profile_picture %}{{ form.instance.profile_picture.url }}{% else %}data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23e2e8f0' width='100' height='100'/%3E%3Ctext fill='%23475569' font-family='Arial' font-size='12' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3EPhoto%3C/text%3E%3C/svg%3E{% endif %}" 
+                 alt="Profile Picture" id="profile_picture_preview">
+            <div class="logo-upload-overlay" onclick="document.getElementById('id_profile_picture_input').click()">
+                Change
             </div>
-
-            {% csrf_token %}
-            {{ form.latitude }}
-            {{ form.longitude }}
-
-            <div class="form-grid">
-                <div>
-                    <div class="form-group">
-                        <label for="id_username">Username</label>
-                        <input type="text" name="username" id="id_username" value="{{ user.username }}" maxlength="150" class="{% if username_error %}input-error{% endif %}">
-                        {% if username_error %}
-                            <p class="field-error">{{ username_error }}</p>
-                        {% endif %}
-                        <p class="form-help-text">Your unique username for login and display.</p>
-                    </div>
-                    
-                    <div class="form-group">
-                        {{ form.full_name.label_tag }}
-                        {{ form.full_name }}
-                    </div>
-
-                    <div class="form-group">
-                        {{ form.email.label_tag }}
-                        {{ form.email }}
-                    </div>
-
-                    <div class="form-group">
-                        {{ form.phone_number.label_tag }}
-                        {{ form.phone_number }}
-                    </div>
-
-                    <div class="form-group">
-                        <label>Aadhar Number</label>
-                        {{ form.aadhar_number.as_hidden }} <!-- Hidden input to store combined value -->
-                        
-                        <div class="aadhar-input-group">
-                            <input type="text" class="aadhar-part" maxlength="4" data-index="0" placeholder="1234">
-                            <span class="separator">-</span>
-                            <input type="text" class="aadhar-part" maxlength="4" data-index="1" placeholder="5678">
-                            <span class="separator">-</span>
-                            <input type="text" class="aadhar-part" maxlength="4" data-index="2" placeholder="9012">
-                        </div>
-                        <p class="form-help-text">12-digit Unique Identity Number</p>
-                    </div>
-
-                    <style>
-                        .aadhar-input-group {
-                            display: flex;
-                            align-items: center;
-                            gap: 0.5rem;
-                        }
-                        .aadhar-part {
-                            width: 80px;
-                            text-align: center;
-                            letter-spacing: 2px;
-                        }
-                        .separator {
-                            font-weight: bold;
-                            color: #cbd5e1;
-                        }
-                    </style>
-                    
-                    <div class="form-group">
-                        <label>Skills</label>
-                        
-                        <div class="skills-display-container" id="skills-display">
-                            <div class="skills-badges">
-                                {% if form.instance.skills %}
-                                    {% for skill in form.instance.skills.split %}
-                                        {% if skill %}
-                                        <span class="skill-badge">
-                                            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="20 6 9 17 4 12"/>
-                                            </svg>
-                                            {{ skill|cut:"," }}
-                                        </span>
-                                        {% endif %}
-                                    {% endfor %}
-                                {% else %}
-                                    <span class="no-skills-text">No skills added yet. Click Edit to add your skills.</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="skills-edit-container" id="skills-edit">
-                            <div class="skills-checkbox-group">
-                                <label class="skill-checkbox-item">
-                                    <input type="checkbox" name="skills" value="driving" {% if 'Driving' in form.instance.skills %}checked{% endif %}>
-                                    <span class="skill-label">Driving</span>
-                                </label>
-                                <label class="skill-checkbox-item">
-                                    <input type="checkbox" name="skills" value="first_aid" {% if 'First Aid' in form.instance.skills %}checked{% endif %}>
-                                    <span class="skill-label">First Aid</span>
-                                </label>
-                                <label class="skill-checkbox-item">
-                                    <input type="checkbox" name="skills" value="cooking" {% if 'Cooking' in form.instance.skills %}checked{% endif %}>
-                                    <span class="skill-label">Cooking</span>
-                                </label>
-                                <label class="skill-checkbox-item">
-                                    <input type="checkbox" name="skills" value="logistics" {% if 'Logistics' in form.instance.skills %}checked{% endif %}>
-                                    <span class="skill-label">Logistics</span>
-                                </label>
-                                <label class="skill-checkbox-item">
-                                    <input type="checkbox" name="skills" value="communication" {% if 'Communication' in form.instance.skills %}checked{% endif %}>
-                                    <span class="skill-label">Communication</span>
-                                </label>
-                                <label class="skill-checkbox-item">
-                                    <input type="checkbox" name="skills" value="medical" {% if 'Medical' in form.instance.skills %}checked{% endif %}>
-                                    <span class="skill-label">Medical</span>
-                                </label>
-                                <label class="skill-checkbox-item">
-                                    <input type="checkbox" name="skills" value="packaging" {% if 'Packaging' in form.instance.skills %}checked{% endif %}>
-                                    <span class="skill-label">Packaging</span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="image-upload-section">
-                    <div class="image-upload-widget">
-                        <label>Profile Picture</label>
-                        <div class="image-preview-container">
-                            <img src="{% if form.instance.profile_picture %}{{ form.instance.profile_picture.url }}{% else %}data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Crect fill='%23e2e8f0' width='120' height='120'/%3E%3Ctext fill='%23475569' font-family='Arial' font-size='14' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3EPhoto%3C/text%3E%3C/svg%3E{% endif %}"
-                                alt="Profile Picture" class="image-preview" id="profile_picture_preview">
-                        </div>
-                        <input type="file" id="id_profile_picture_input" accept="image/*"
-                            onchange="modernCropperOpen(event, 1, 'id_profile_picture')" style="display: none;">
-                        <button type="button" class="upload-btn image-upload-btn"
-                            onclick="document.getElementById('id_profile_picture_input').click()">
-                            Choose Image
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div style="display: none;">
-                {{ form.profile_picture }}
-            </div>
-
-            <div class="map-section">
-                <h3>Location & Address</h3>
-                <div class="form-group">
-                    {{ form.address.label_tag }}
-                    <div class="address-group">
-                        {{ form.address }}
-                        <button type="button" class="map-action-btn" onclick="findAddressOnMap()">Find Location</button>
-                        <button type="button" class="map-action-btn find-my-location-btn" onclick="findMyLocation()" style="background-color: #10b981;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;">
-                                <circle cx="12" cy="12" r="10"/>
-                                <circle cx="12" cy="12" r="3"/>
-                                <line x1="12" y1="2" x2="12" y2="6"/>
-                                <line x1="12" y1="18" x2="12" y2="22"/>
-                                <line x1="2" y1="12" x2="6" y2="12"/>
-                                <line x1="18" y1="12" x2="22" y2="12"/>
-                            </svg>
-                            Find My Location
-                        </button>
-                    </div>
-                </div>
-                <div id="location-map"></div>
-                <p class="form-help-text">
-                    Type an address and click "Find Location", use "Find My Location" for GPS, or click on the map to update your location.
-                </p>
-            </div>
-
-            <div style="display: none;"> <!-- Original bottom buttons hidden/removed --> </div>
-        </form>
+            <input type="file" id="id_profile_picture_input" accept="image/*" 
+                onchange="modernCropperOpen(event, 1, 'id_profile_picture')" style="display: none;">
+        </div>
+        
+        <div class="profile-info">
+            <h1 class="profile-name">{{ form.instance.full_name|default:"Volunteer Name" }}</h1>
+            <span class="profile-username">@{{ user.username }}</span>
+        </div>
+        
+        <div class="header-actions">
+            <button type="button" id="edit-profile-btn" onclick="enableEditMode()">Edit Profile</button>
+            <button type="submit" id="save-changes-btn" style="display: none;">Save Changes</button>
+        </div>
     </div>
-</div>
+    
+    <div style="display: none;">{{ form.profile_picture }}</div>
+    
+    <!-- Personal Details Section -->
+    <div class="form-section">
+        <h3>Personal Details</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="id_username">Username</label>
+                <input type="text" name="username" id="id_username" value="{{ user.username }}" maxlength="150" class="{% if username_error %}input-error{% endif %}">
+                {% if username_error %}<p class="field-error">{{ username_error }}</p>{% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.full_name.label_tag }}
+                {{ form.full_name }}
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Aadhar Number</label>
+                {{ form.aadhar_number.as_hidden }}
+                <div class="aadhar-input-group">
+                    <input type="text" class="aadhar-part" maxlength="4" data-index="0" placeholder="1234">
+                    <span class="separator">-</span>
+                    <input type="text" class="aadhar-part" maxlength="4" data-index="1" placeholder="5678">
+                    <span class="separator">-</span>
+                    <input type="text" class="aadhar-part" maxlength="4" data-index="2" placeholder="9012">
+                </div>
+                <p class="form-help-text">12-digit Unique Identity Number</p>
+            </div>
+            <div class="form-group">
+                <!-- Empty for balance -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Contact Information Section -->
+    <div class="form-section">
+        <h3>Contact Information</h3>
+        <div class="form-row">
+            <div class="form-group">
+                {{ form.email.label_tag }}
+                {{ form.email }}
+            </div>
+            <div class="form-group">
+                {{ form.phone_number.label_tag }}
+                {{ form.phone_number }}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Skills Section -->
+    <div class="form-section">
+        <h3>Skills</h3>
+        <div class="skills-badges" id="skills-display">
+            {% if form.instance.skills %}
+                {% for skill in form.instance.skills.split %}
+                    {% if skill %}
+                    <span class="skill-badge">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                        {{ skill|cut:"," }}
+                    </span>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <span style="color: var(--text-muted);">No skills added yet. Click Edit to add your skills.</span>
+            {% endif %}
+        </div>
+        
+        <div class="skills-checkbox-group" id="skills-edit">
+            <label class="skill-checkbox-item">
+                <input type="checkbox" name="skills" value="driving" {% if 'Driving' in form.instance.skills %}checked{% endif %}>
+                <span>Driving</span>
+            </label>
+            <label class="skill-checkbox-item">
+                <input type="checkbox" name="skills" value="first_aid" {% if 'First Aid' in form.instance.skills %}checked{% endif %}>
+                <span>First Aid</span>
+            </label>
+            <label class="skill-checkbox-item">
+                <input type="checkbox" name="skills" value="cooking" {% if 'Cooking' in form.instance.skills %}checked{% endif %}>
+                <span>Cooking</span>
+            </label>
+            <label class="skill-checkbox-item">
+                <input type="checkbox" name="skills" value="logistics" {% if 'Logistics' in form.instance.skills %}checked{% endif %}>
+                <span>Logistics</span>
+            </label>
+            <label class="skill-checkbox-item">
+                <input type="checkbox" name="skills" value="communication" {% if 'Communication' in form.instance.skills %}checked{% endif %}>
+                <span>Communication</span>
+            </label>
+            <label class="skill-checkbox-item">
+                <input type="checkbox" name="skills" value="medical" {% if 'Medical' in form.instance.skills %}checked{% endif %}>
+                <span>Medical</span>
+            </label>
+            <label class="skill-checkbox-item">
+                <input type="checkbox" name="skills" value="packaging" {% if 'Packaging' in form.instance.skills %}checked{% endif %}>
+                <span>Packaging</span>
+            </label>
+        </div>
+    </div>
+    
+    <!-- Location Section -->
+    <div class="form-section">
+        <h3>Location</h3>
+        <div class="form-group">
+            {{ form.address.label_tag }}
+            <div class="address-group">
+                {{ form.address }}
+                <button type="button" class="map-action-btn" onclick="findAddressOnMap()">Find Location</button>
+                <button type="button" class="map-action-btn find-my-location-btn" onclick="findMyLocation()" style="background-color: #10b981;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;">
+                        <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+                        <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+                        <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+                    </svg>
+                    Find My Location
+                </button>
+            </div>
+        </div>
+        <div id="location-map" style="height: 300px; border-radius: var(--radius, 0.5rem); margin-top: 1rem;"></div>
+        <p class="form-help-text">Type an address and click "Find Location", use GPS, or click on the map.</p>
+    </div>
+</form>
 
 {% include 'components/image_cropper_modal.html' %}
 {% endblock volunteer_content %}
@@ -281,287 +331,148 @@
 {% block scripts %}
 {{ block.super }}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // --- MAP INITIALIZATION ---
-        const initialLat = parseFloat("{{ form.instance.latitude|default:'28.6139'|escapejs }}");
-        const initialLon = parseFloat("{{ form.instance.longitude|default:'77.2090'|escapejs }}");
-        const initialZoom = parseInt("{{ form.instance.latitude|yesno:'15,11' }}");
+document.addEventListener('DOMContentLoaded', function () {
+    // --- MAP INITIALIZATION ---
+    const initialLat = parseFloat("{{ form.instance.latitude|default:'28.6139'|escapejs }}");
+    const initialLon = parseFloat("{{ form.instance.longitude|default:'77.2090'|escapejs }}");
+    const initialZoom = parseInt("{{ form.instance.latitude|yesno:'15,11' }}");
 
-        const map = L.map('location-map', {
-            zoomControl: false,
-            attributionControl: false
-        }).setView([initialLat, initialLon], initialZoom);
+    const map = L.map('location-map', { zoomControl: false, attributionControl: false }).setView([initialLat, initialLon], initialZoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    let marker = null;
+    const latField = document.getElementById('id_latitude');
+    const lonField = document.getElementById('id_longitude');
+    const addressField = document.getElementById('id_address');
+
+    if (latField.value && lonField.value) {
+        marker = L.marker([latField.value, lonField.value]).addTo(map);
+    }
+
+    function updateMarkerAndFields(lat, lon, address = null) {
+        latField.value = lat;
+        lonField.value = lon;
+        if (address) addressField.value = address;
+        if (marker) marker.setLatLng([lat, lon]);
+        else marker = L.marker([lat, lon]).addTo(map);
+        map.setView([lat, lon], 15);
+    }
+
+    window.findAddressOnMap = function() {
+        const address = addressField.value;
+        if (!address) { alert("Please enter an address to find."); return; }
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`)
+            .then(r => r.json())
+            .then(d => { if (d.length > 0) updateMarkerAndFields(d[0].lat, d[0].lon); else alert("Address not found."); });
+    }
+    
+    window.findMyLocation = function() {
+        if (!navigator.geolocation) { showToast('Geolocation not supported', 'error'); return; }
+        const btn = document.querySelector('.find-my-location-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Finding...'; }
         
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-        let marker = null;
-        const latField = document.getElementById('id_latitude');
-        const lonField = document.getElementById('id_longitude');
-        const addressField = document.getElementById('id_address');
-
-        if (latField.value && lonField.value) {
-            marker = L.marker([latField.value, lonField.value]).addTo(map);
-        }
-
-        function updateMarkerAndFields(lat, lon, address = null) {
-            latField.value = lat;
-            lonField.value = lon;
-            if (address) {
-                addressField.value = address;
-            }
-            if (marker) {
-                marker.setLatLng([lat, lon]);
-            } else {
-                marker = L.marker([lat, lon]).addTo(map);
-            }
-            map.setView([lat, lon], 15);
-        }
-
-        window.findAddressOnMap = function() {
-            const address = addressField.value;
-            if (!address) { alert("Please enter an address to find."); return; }
-            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`)
-                .then(r => r.json())
-                .then(d => {
-                    if (d.length > 0) {
-                        updateMarkerAndFields(d[0].lat, d[0].lon);
-                    } else {
-                        alert("Address not found.");
-                    }
-                });
-        }
-        
-        // Find My Location using Geolocation API
-        window.findMyLocation = function() {
-            if (!navigator.geolocation) {
-                showToast('Geolocation is not supported by your browser', 'error');
-                return;
-            }
-            
-            const btn = document.querySelector('.find-my-location-btn');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<span class="loading-spinner"></span> Finding...';
-            }
-            
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    
-                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
-                        .then(r => r.json())
-                        .then(d => {
-                            updateMarkerAndFields(lat, lon, d.display_name || 'Location found');
-                            showToast('Location found successfully!', 'success');
-                        })
-                        .catch(() => {
-                            updateMarkerAndFields(lat, lon, `${lat.toFixed(6)}, ${lon.toFixed(6)}`);
-                            showToast('Location found!', 'success');
-                        })
-                        .finally(() => {
-                            if (btn) {
-                                btn.disabled = false;
-                                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <circle cx="12" cy="12" r="3"/>
-                                    <line x1="12" y1="2" x2="12" y2="6"/>
-                                    <line x1="12" y1="18" x2="12" y2="22"/>
-                                    <line x1="2" y1="12" x2="6" y2="12"/>
-                                    <line x1="18" y1="12" x2="22" y2="12"/>
-                                </svg> Find My Location`;
-                            }
-                        });
-                },
-                function(error) {
-                    let message = 'Unable to find your location';
-                    switch(error.code) {
-                        case error.PERMISSION_DENIED:
-                            message = 'Please allow location access in your browser settings';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            message = 'Location information unavailable';
-                            break;
-                        case error.TIMEOUT:
-                            message = 'Location request timed out';
-                            break;
-                    }
-                    showToast(message, 'error');
-                    
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.innerHTML = 'Find My Location';
-                    }
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        }
-        
-        map.on('click', function (e) {
-            const lat = e.latlng.lat;
-            const lon = e.latlng.lng;
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
-                .then(r => r.json())
-                .then(d => updateMarkerAndFields(lat, lon, d.display_name || 'Location selected'));
-        });
-
-        // Ensure map renders correctly
-        setTimeout(() => map.invalidateSize(), 200);
-
-        // --- EDIT/SAVE MODE FUNCTIONALITY ---
-        const form = document.getElementById('profile-form');
-        const editBtn = document.getElementById('edit-profile-btn');
-        const saveBtn = document.getElementById('save-changes-btn');
-        const imageUploadBtns = document.querySelectorAll('.image-upload-btn');
-        const mapActionBtns = document.querySelectorAll('.map-action-btn');
-
-        function setReadOnlyMode() {
-            document.body.classList.remove('edit-mode');
-            
-            const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]), textarea, select');
-            inputs.forEach(input => {
-                input.setAttribute('readonly', 'readonly');
-                input.style.pointerEvents = 'none';
-                input.style.backgroundColor = '#f9fafb';
-            });
-            
-            const checkboxes = form.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(cb => { cb.disabled = true; });
-
-            imageUploadBtns.forEach(btn => btn.style.display = 'none');
-            mapActionBtns.forEach(btn => btn.disabled = true);
-            map.off('click');
-
-            editBtn.style.display = 'inline-block';
-            saveBtn.style.display = 'none';
-        }
-
-        window.enableEditMode = function() {
-            document.body.classList.add('edit-mode');
-            
-            const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]), textarea, select');
-            inputs.forEach(input => {
-                input.removeAttribute('readonly');
-                input.style.pointerEvents = 'auto';
-                input.style.backgroundColor = 'white';
-            });
-            
-            const checkboxes = form.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(cb => { cb.disabled = false; });
-
-            imageUploadBtns.forEach(btn => btn.style.display = 'inline-block');
-            mapActionBtns.forEach(btn => btn.disabled = false);
-            
-            map.on('click', function (e) {
-                const lat = e.latlng.lat;
-                const lon = e.latlng.lng;
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const lat = position.coords.latitude, lon = position.coords.longitude;
                 fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
                     .then(r => r.json())
-                    .then(d => updateMarkerAndFields(lat, lon, d.display_name || 'Location selected'));
-            });
-
-            editBtn.style.display = 'none';
-            saveBtn.style.display = 'inline-block';
-        }
-
-        setReadOnlyMode();
-        
-        // --- AADHAR INPUT LOGIC ---
-        const aadharHidden = document.getElementById('id_aadhar_number');
-        const aadharParts = document.querySelectorAll('.aadhar-part');
-        
-        function updateHiddenAadhar() {
-            const part1 = aadharParts[0].value;
-            const part2 = aadharParts[1].value;
-            const part3 = aadharParts[2].value;
-            aadharHidden.value = `${part1}${part2}${part3}`;
-        }
-        
-        // Initialize values from hidden input
-        if (aadharHidden.value) {
-            const val = aadharHidden.value.replace(/\D/g, ''); // digits only
-            if (val.length > 0) aadharParts[0].value = val.slice(0, 4);
-            if (val.length > 4) aadharParts[1].value = val.slice(4, 8);
-            if (val.length > 8) aadharParts[2].value = val.slice(8, 12);
-        }
-        
-        aadharParts.forEach((input, idx) => {
-            // Allow numbers only
-            input.addEventListener('input', (e) => {
-                e.target.value = e.target.value.replace(/\D/g, '');
-                
-                // Auto-advance
-                if (e.target.value.length === 4) {
-                    if (idx < 2) aadharParts[idx + 1].focus();
-                }
-                updateHiddenAadhar();
-            });
-            
-            // Handle Backspace
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Backspace' && e.target.value.length === 0) {
-                    if (idx > 0) {
-                        e.preventDefault();
-                        const prev = aadharParts[idx - 1];
-                        prev.focus();
-                        // Optional: delete last char of prev
-                        // prev.value = prev.value.slice(0, -1);
-                        // updateHiddenAadhar();
-                    }
-                }
-            });
-            
-            // Handle Paste
-            input.addEventListener('paste', (e) => {
-                e.preventDefault();
-                const pasteData = (e.clipboardData || window.clipboardData).getData('text');
-                const cleanData = pasteData.replace(/\D/g, '').slice(0, 12); // Max 12 digits
-                
-                if (cleanData) {
-                    aadharParts[0].value = cleanData.slice(0, 4);
-                    aadharParts[1].value = cleanData.slice(4, 8);
-                    aadharParts[2].value = cleanData.slice(8, 12);
-                    
-                    // Focus logic after paste
-                    if (cleanData.length > 8) aadharParts[2].focus();
-                    else if (cleanData.length > 4) aadharParts[1].focus();
-                    else aadharParts[0].focus();
-                    
-                    updateHiddenAadhar();
-                }
-            });
-        });
-
-        // Ensure Aadhar fields are readonly in view mode and editable in edit mode
-        function toggleAadharEditable(isEditable) {
-            aadharParts.forEach(part => {
-                if (isEditable) {
-                    part.removeAttribute('readonly');
-                    part.style.backgroundColor = 'white';
-                    part.style.pointerEvents = 'auto';
-                } else {
-                    part.setAttribute('readonly', 'readonly');
-                    part.style.backgroundColor = '#f9fafb';
-                    part.style.pointerEvents = 'none';
-                }
-            });
-        }
-        
-        // Hook into existing mode toggle functions
-        const originalSetReadOnly = setReadOnlyMode;
-        setReadOnlyMode = function() {
-            originalSetReadOnly();
-            toggleAadharEditable(false);
-        };
-        
-        const originalEnableEditMode = window.enableEditMode;
-        window.enableEditMode = function() {
-            originalEnableEditMode();
-            toggleAadharEditable(true);
-        };
-        
-        // Initial state
-        toggleAadharEditable(false);
+                    .then(d => { updateMarkerAndFields(lat, lon, d.display_name || 'Location found'); showToast('Location found!', 'success'); })
+                    .finally(() => { if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg> Find My Location'; } });
+            },
+            function(error) { showToast('Unable to find location', 'error'); if (btn) btn.disabled = false; },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+    
+    map.on('click', function (e) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`)
+            .then(r => r.json())
+            .then(d => updateMarkerAndFields(e.latlng.lat, e.latlng.lng, d.display_name || 'Location selected'));
     });
+
+    setTimeout(() => map.invalidateSize(), 200);
+
+    // --- EDIT/SAVE MODE ---
+    const form = document.getElementById('profile-form');
+    const editBtn = document.getElementById('edit-profile-btn');
+    const saveBtn = document.getElementById('save-changes-btn');
+    const logoOverlay = document.querySelector('.logo-upload-overlay');
+    const mapActionBtns = document.querySelectorAll('.map-action-btn');
+    const aadharParts = document.querySelectorAll('.aadhar-part');
+
+    function setReadOnlyMode() {
+        document.body.classList.remove('edit-mode');
+        const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]), textarea, select');
+        inputs.forEach(input => { input.setAttribute('readonly', 'readonly'); input.style.pointerEvents = 'none'; input.style.backgroundColor = '#f9fafb'; });
+        form.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.disabled = true);
+        aadharParts.forEach(p => { p.setAttribute('readonly', 'readonly'); p.style.pointerEvents = 'none'; p.style.backgroundColor = '#f9fafb'; });
+        if (logoOverlay) logoOverlay.style.opacity = '0';
+        mapActionBtns.forEach(btn => btn.disabled = true);
+        map.off('click');
+        editBtn.style.display = 'inline-block';
+        saveBtn.style.display = 'none';
+    }
+
+    window.enableEditMode = function() {
+        document.body.classList.add('edit-mode');
+        const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]), textarea, select');
+        inputs.forEach(input => { input.removeAttribute('readonly'); input.style.pointerEvents = 'auto'; input.style.backgroundColor = 'white'; });
+        form.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.disabled = false);
+        aadharParts.forEach(p => { p.removeAttribute('readonly'); p.style.pointerEvents = 'auto'; p.style.backgroundColor = 'white'; });
+        if (logoOverlay) logoOverlay.style.opacity = '1';
+        mapActionBtns.forEach(btn => btn.disabled = false);
+        map.on('click', function (e) {
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`)
+                .then(r => r.json())
+                .then(d => updateMarkerAndFields(e.latlng.lat, e.latlng.lng, d.display_name || 'Location selected'));
+        });
+        editBtn.style.display = 'none';
+        saveBtn.style.display = 'inline-block';
+    }
+
+    setReadOnlyMode();
+    
+    // --- AADHAR INPUT LOGIC ---
+    const aadharHidden = document.getElementById('id_aadhar_number');
+    
+    function updateHiddenAadhar() {
+        aadharHidden.value = `${aadharParts[0].value}${aadharParts[1].value}${aadharParts[2].value}`;
+    }
+    
+    if (aadharHidden.value) {
+        const val = aadharHidden.value.replace(/\D/g, '');
+        if (val.length > 0) aadharParts[0].value = val.slice(0, 4);
+        if (val.length > 4) aadharParts[1].value = val.slice(4, 8);
+        if (val.length > 8) aadharParts[2].value = val.slice(8, 12);
+    }
+    
+    aadharParts.forEach((input, idx) => {
+        input.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '');
+            if (e.target.value.length === 4 && idx < 2) aadharParts[idx + 1].focus();
+            updateHiddenAadhar();
+        });
+        
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && e.target.value.length === 0 && idx > 0) {
+                e.preventDefault();
+                aadharParts[idx - 1].focus();
+            }
+        });
+        
+        input.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const cleanData = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 12);
+            if (cleanData) {
+                aadharParts[0].value = cleanData.slice(0, 4);
+                aadharParts[1].value = cleanData.slice(4, 8);
+                aadharParts[2].value = cleanData.slice(8, 12);
+                if (cleanData.length > 8) aadharParts[2].focus();
+                else if (cleanData.length > 4) aadharParts[1].focus();
+                updateHiddenAadhar();
+            }
+        });
+    });
+});
 </script>
 {% endblock scripts %}

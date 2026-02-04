@@ -27,7 +27,7 @@ def ngo_dashboard_overview(request):
         'total_donations_received': Donation.objects.filter(target_camp__ngo=ngo_profile, status='DELIVERED').count()
     }
     context = {'stats': stats}
-    return render(request, 'ngo/dashboard_overview.html', context)
+    return render(request, 'ngo/dashboard.html', context)
 
 @login_required(login_url='login_page')
 @user_type_required('NGO')
@@ -66,7 +66,7 @@ def ngo_manage_camps(request):
         'delivered_donations': delivered_donations,
         'active_tab': view_param
     }
-    return render(request, 'ngo/manage_camps.html', context)
+    return render(request, 'ngo/camps.html', context)
 
 @login_required(login_url='login_page')
 @user_type_required('NGO')
@@ -80,7 +80,7 @@ def ngo_manage_volunteers(request):
         )
     ).order_by('full_name')
     context = {'volunteers': registered_volunteers}
-    return render(request, 'ngo/manage_volunteers.html', context)
+    return render(request, 'ngo/volunteers.html', context)
 
 @login_required(login_url='login_page')
 @user_type_required('NGO')
@@ -243,7 +243,7 @@ def ngo_register_volunteer(request):
         'registered_volunteers': registered_volunteers,
         'error_popup': error_popup,
     }
-    return render(request, 'ngo/register_volunteer.html', context)
+    return render(request, 'ngo/volunteer_register.html', context)
 
 @login_required(login_url='login_page')
 @user_type_required('NGO')
@@ -288,4 +288,4 @@ def ngo_reset_volunteer_password(request, volunteer_id):
         return redirect('ngo_register_volunteer')
     
     context = {'volunteer': volunteer_profile}
-    return render(request, 'ngo/reset_volunteer_password.html', context)
+    return render(request, 'ngo/volunteer_password_reset.html', context)

@@ -48,6 +48,7 @@ class RestaurantProfile(models.Model):
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
     profile_picture = models.ImageField(upload_to='profile_pictures/restaurants/', null=True, blank=True)
+    banner_image = models.ImageField(upload_to='banners/restaurants/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     def __str__(self):

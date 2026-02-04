@@ -51,7 +51,7 @@ def ngo_pending_verifications(request):
         'ngo_profile': ngo_profile
     }
     
-    return render(request, 'ngo/pending_verifications.html', context)
+    return render(request, 'ngo/verifications.html', context)
 
 
 @login_required(login_url='login_page')

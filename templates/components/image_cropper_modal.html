@@ -392,6 +392,15 @@ function modernCropperOpen(event, aspectRatio, targetInputId) {
         const modal = document.getElementById('modern-cropper-modal');
         const image = document.getElementById('modern-cropper-image');
         
+        // Determine correct preview ID
+        // Logic: id_banner_image -> banner_image_preview
+        // Logic: id_banner_image_input -> banner_image_preview
+        let baseId = targetInputId.replace(/^id_/, '');
+        if (baseId.endsWith('_input')) {
+            baseId = baseId.replace(/_input$/, '');
+        }
+        const previewId = baseId + '_preview';
+
         // Set image source
         image.src = e.target.result;
         
@@ -404,37 +413,48 @@ function modernCropperOpen(event, aspectRatio, targetInputId) {
         }
         
         // Initialize new Cropper instance
-        modernCropperInstance = new Cropper(image, {
-            aspectRatio: aspectRatio,
-            viewMode: 1,
-            dragMode: 'move',
-            autoCropArea: 1,
-            restore: false,
-            guides: true,
-            center: true,
-            highlight: true,
-            cropBoxMovable: false,
-            cropBoxResizable: false,
-            toggleDragModeOnDblclick: false,
-            background: false,
-            responsive: true,
-            ready: function() {
-                // Reset zoom slider
-                document.getElementById('zoom-slider').value = 100;
-                document.getElementById('zoom-percentage').textContent = '100%';
-            },
-            zoom: function(event) {
-                // Update zoom percentage display
-                const zoomRatio = event.detail.ratio;
-                const percentage = Math.round(zoomRatio * 100);
-                document.getElementById('zoom-percentage').textContent = percentage + '%';
-            }
-        });
+        // Wait for image to load to avoid issues
+        image.onload = function() {
+            modernCropperInstance = new Cropper(image, {
+                aspectRatio: aspectRatio,
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 1,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: true,
+                cropBoxMovable: false, // Box fixed, image moves
+                cropBoxResizable: false,
+                toggleDragModeOnDblclick: false,
+                background: false,
+                responsive: true,
+                rotatable: true,
+                scalable: true,
+                zoomable: true,
+                zoomOnTouch: true,
+                zoomOnWheel: true,
+                ready: function() {
+                    // Reset zoom slider
+                    document.getElementById('zoom-slider').value = 100;
+                    document.getElementById('zoom-percentage').textContent = '100%';
+                },
+                zoom: function(event) {
+                    // Update zoom percentage display
+                    if (event.detail.ratio) {
+                        const imageData = this.cropper.getImageData();
+                        const percentage = Math.round((imageData.width / imageData.naturalWidth) * 100);
+                        document.getElementById('zoom-percentage').textContent = percentage + '%';
+                        document.getElementById('zoom-slider').value = percentage;
+                    }
+                }
+            });
+        };
         
         // Store target information
         modernCropperSourceFileName = file.name;
-        modernCropperTargetInput = targetInputId;
-        modernCropperTargetPreview = targetInputId.replace('id_', '') + '_preview';
+        modernCropperTargetInput = targetInputId; // This is the ID of the hidden input
+        modernCropperTargetPreview = previewId;
     };
     
     reader.readAsDataURL(file);

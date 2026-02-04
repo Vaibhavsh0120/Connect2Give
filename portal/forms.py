@@ -221,6 +221,7 @@ class RestaurantProfileForm(forms.ModelForm):
             'latitude',
             'longitude',
             'profile_picture',
+            'banner_image',
             'fssai_number'
         ]
         labels = {

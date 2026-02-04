@@ -7,114 +7,269 @@
 {% block page_description %}Update your restaurant's public information{% endblock %}
 
 {% block restaurant_content %}
-<div class="profile-container">
-    <div class="profile-form">
-        <form method="POST" enctype="multipart/form-data" action="{% url 'restaurant_profile' %}" id="profile-form">
-            <div class="profile-header-actions" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center;">
-                <div class="verification-status">
-                    {% if user.is_verified %}
-                        <span class="badge verified" style="background: #dcfce7; color: #166534; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                            Verified
-                        </span>
-                    {% else %}
-                        <span class="badge pending" style="background: #fef9c3; color: #854d0e; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600;">
-                            Verification Pending
-                        </span>
-                    {% endif %}
-                </div>
-                <div class="action-buttons">
-                    <button type="button" id="edit-profile-btn" onclick="enableEditMode()">Edit Profile</button>
-                    <button type="submit" id="save-changes-btn" style="display: none;">Save Changes</button>
+<style>
+    .profile-header {
+        position: relative;
+        margin-bottom: 2rem;
+    }
+    
+    .banner-section {
+        width: 100%;
+        height: 180px;
+        border-radius: var(--radius, 0.75rem);
+        overflow: hidden;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        position: relative;
+    }
+    
+    .banner-section img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .profile-info-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 1.5rem;
+        margin-top: -3rem;
+        padding: 0 1.5rem;
+        position: relative;
+        z-index: 2;
+    }
+    
+    .logo-section {
+        flex-shrink: 0;
+    }
+    
+    .logo-container {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 4px solid var(--bg-card, white);
+        background: var(--bg-card, #f8f9fa);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        position: relative;
+    }
+    
+    .logo-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .logo-upload-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0,0,0,0.6);
+        color: white;
+        text-align: center;
+        padding: 0.25rem;
+        font-size: 0.7rem;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    
+    .logo-container:hover .logo-upload-overlay {
+        opacity: 1;
+    }
+    
+    body.edit-mode .logo-upload-overlay {
+        display: block;
+    }
+    
+    .org-title-section {
+        flex: 1;
+        padding-bottom: 0.5rem;
+    }
+    
+    .org-name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary, #1a1a2e);
+        margin: 0 0 0.25rem 0;
+    }
+    
+    .org-username {
+        color: var(--text-muted, #6c757d);
+        font-size: 0.9rem;
+    }
+    
+    .header-actions {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        padding-bottom: 0.5rem;
+    }
+    
+    .form-section {
+        background: var(--bg-card, white);
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: var(--radius, 0.75rem);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-section h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-primary, #1a1a2e);
+        margin: 0 0 1.25rem 0;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border, #e2e8f0);
+    }
+    
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    
+    @media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+        .profile-info-row {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .header-actions {
+            justify-content: center;
+        }
+    }
+    
+    .banner-upload-overlay {
+        position: absolute;
+        bottom: 0.75rem;
+        right: 0.75rem;
+        display: none;
+        z-index: 20;
+    }
+</style>
+
+<form method="POST" enctype="multipart/form-data" action="{% url 'restaurant_profile' %}" id="profile-form">
+    {% csrf_token %}
+    {{ form.latitude }}
+    {{ form.longitude }}
+    
+    <!-- Profile Header -->
+    <div class="profile-header">
+        <div class="banner-section">
+            <img src="{% if form.instance.banner_image %}{{ form.instance.banner_image.url }}{% else %}data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='180' viewBox='0 0 800 180'%3E%3Crect fill='%23e2e8f0' width='800' height='180'/%3E%3Ctext fill='%23475569' font-family='Arial' font-size='18' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3EUpload a Banner Image%3C/text%3E%3C/svg%3E{% endif %}" 
+                 id="banner_image_preview" alt="Banner">
+            <div class="banner-upload-overlay image-upload-btn">
+                <input type="file" id="id_banner_image_input" accept="image/*" 
+                    onchange="modernCropperOpen(event, 4, 'id_banner_image')" style="display: none;">
+                <button type="button" class="upload-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 6px; cursor: pointer;"
+                    onclick="document.getElementById('id_banner_image_input').click()">
+                    Change Banner
+                </button>
+            </div>
+        </div>
+        
+        <div class="profile-info-row">
+            <div class="logo-section">
+                <div class="logo-container">
+                    <img src="{% if form.instance.profile_picture %}{{ form.instance.profile_picture.url }}{% else %}data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Crect fill='%23e2e8f0' width='120' height='120'/%3E%3Ctext fill='%23475569' font-family='Arial' font-size='14' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3ELogo%3C/text%3E%3C/svg%3E{% endif %}" 
+                         alt="Profile Picture" id="profile_picture_preview">
+                    <div class="logo-upload-overlay" onclick="document.getElementById('id_profile_picture_input').click()">
+                        Change
+                    </div>
+                    <input type="file" id="id_profile_picture_input" accept="image/*" 
+                        onchange="modernCropperOpen(event, 1, 'id_profile_picture')" style="display: none;">
                 </div>
             </div>
-
-            {% csrf_token %}
-            {{ form.latitude }}
-            {{ form.longitude }}
-
-            <div class="form-grid">
-                <div>
-                    <div class="form-group">
-                        <label for="id_username">Username</label>
-                        <input type="text" name="username" id="id_username" value="{{ user.username }}" maxlength="150" class="{% if username_error %}input-error{% endif %}">
-                        {% if username_error %}
-                            <p class="field-error">{{ username_error }}</p>
-                        {% endif %}
-                        <p class="form-help-text">Your unique username for login and display.</p>
-                    </div>
-                    
-                    <div class="form-group">
-                        {{ form.restaurant_name.label_tag }}
-                        {{ form.restaurant_name }}
-                    </div>
-
-                    <div class="form-group">
-                        {{ form.full_name.label_tag }}
-                        {{ form.full_name }}
-                    </div>
-
-                    <div class="form-group">
-                        {{ form.email.label_tag }}
-                        {{ form.email }}
-                    </div>
-
-                    <div class="form-group">
-                        {{ form.phone_number.label_tag }}
-                        {{ form.phone_number }}
-                    </div>
-
-                    <div class="form-group">
-                        {{ form.fssai_number.label_tag }}
-                        {{ form.fssai_number }}
-                        {% if user.is_verified %}
-                            <p class="form-help-text" style="color: #166534;">✓ Verified & Locked</p>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="image-upload-section">
-                    <div class="image-upload-widget">
-                        <label>Profile Picture (Logo)</label>
-                        <div class="image-preview-container">
-                            <img src="{% if form.instance.profile_picture %}{{ form.instance.profile_picture.url }}{% else %}data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Crect fill='%23e2e8f0' width='120' height='120'/%3E%3Ctext fill='%23475569' font-family='Arial' font-size='14' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3ELogo%3C/text%3E%3C/svg%3E{% endif %}"
-                                alt="Profile Picture" class="image-preview" id="profile_picture_preview">
-                        </div>
-                        <input type="file" id="id_profile_picture_input" accept="image/*"
-                            onchange="modernCropperOpen(event, 1, 'id_profile_picture')" style="display: none;">
-                        <button type="button" class="upload-btn image-upload-btn"
-                            onclick="document.getElementById('id_profile_picture_input').click()">
-                            Choose Image
-                        </button>
-                    </div>
-                </div>
+            
+            <div class="org-title-section">
+                <h1 class="org-name">{{ form.instance.restaurant_name|default:"Restaurant Name" }}</h1>
+                <span class="org-username">@{{ user.username }}</span>
             </div>
-
-            <div style="display: none;">
-                {{ form.profile_picture }}
+            
+            <div class="header-actions">
+                <span class="badge registered" style="background: #dbeafe; color: #1e40af; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
+                    </svg>
+                    Registered
+                </span>
+                <button type="button" id="edit-profile-btn" onclick="enableEditMode()">Edit Profile</button>
+                <button type="submit" id="save-changes-btn" style="display: none;">Save Changes</button>
             </div>
-
-            <div class="map-section">
-                <h3>Location & Address</h3>
-                <div class="form-group">
-                    {{ form.address.label_tag }}
-                    <div class="address-group">
-                        {{ form.address }}
-                        <button type="button" class="map-action-btn" onclick="findAddressOnMap()">Find Location</button>
-                    </div>
-                </div>
-                <div id="location-map"></div>
-                <p class="form-help-text">
-                    Type an address and click "Find Location", or click on the map to update your location.
-                </p>
-            </div>
-
-            <div style="display: none;"> <!-- Bottom buttons hidden --> </div>
-        </form>
+        </div>
     </div>
-</div>
+    
+    <div style="display: none;">
+        {{ form.profile_picture }}
+        {{ form.banner_image }}
+    </div>
+    
+    <!-- Restaurant Details Section -->
+    <div class="form-section">
+        <h3>Restaurant Details</h3>
+        <div class="form-row">
+            <div class="form-group">
+                {{ form.restaurant_name.label_tag }}
+                {{ form.restaurant_name }}
+            </div>
+            <div class="form-group">
+                {{ form.fssai_number.label_tag }}
+                {{ form.fssai_number }}
+                {% if user.is_verified %}
+                    <p class="form-help-text" style="color: #166534;">Verified & Locked</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Contact Information Section -->
+    <div class="form-section">
+        <h3>Contact Information</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="id_username">Username</label>
+                <input type="text" name="username" id="id_username" value="{{ user.username }}" maxlength="150" class="{% if username_error %}input-error{% endif %}">
+                {% if username_error %}
+                    <p class="field-error">{{ username_error }}</p>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.full_name.label_tag }}
+                {{ form.full_name }}
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                {{ form.email.label_tag }}
+                {{ form.email }}
+            </div>
+            <div class="form-group">
+                {{ form.phone_number.label_tag }}
+                {{ form.phone_number }}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Location Section -->
+    <div class="form-section">
+        <h3>Location</h3>
+        <div class="form-group">
+            {{ form.address.label_tag }}
+            <div class="address-group">
+                {{ form.address }}
+                <button type="button" class="map-action-btn" onclick="findAddressOnMap()">Find Location</button>
+            </div>
+        </div>
+        <div id="location-map" style="height: 300px; border-radius: var(--radius, 0.5rem); margin-top: 1rem;"></div>
+        <p class="form-help-text">
+            Type an address and click "Find Location", or click on the map to update your location.
+        </p>
+    </div>
+</form>
 
 {% include 'components/image_cropper_modal.html' %}
 {% endblock restaurant_content %}
@@ -184,10 +339,11 @@
         const form = document.getElementById('profile-form');
         const editBtn = document.getElementById('edit-profile-btn');
         const saveBtn = document.getElementById('save-changes-btn');
-        const imageUploadBtns = document.querySelectorAll('.image-upload-btn');
+        const logoOverlay = document.querySelector('.logo-upload-overlay');
         const mapActionBtns = document.querySelectorAll('.map-action-btn');
 
         function setReadOnlyMode() {
+            document.body.classList.remove('edit-mode');
             const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="file"]), textarea, select');
             inputs.forEach(input => {
                 input.setAttribute('readonly', 'readonly');
@@ -195,7 +351,9 @@
                 input.style.backgroundColor = '#f9fafb';
             });
 
-            imageUploadBtns.forEach(btn => btn.style.display = 'none');
+            if (logoOverlay) logoOverlay.style.opacity = '0';
+            const bannerButtons = document.querySelectorAll('.banner-upload-overlay');
+            bannerButtons.forEach(btn => btn.style.display = 'none');
             mapActionBtns.forEach(btn => btn.disabled = true);
             map.off('click');
 
@@ -204,6 +362,7 @@
         }
 
         window.enableEditMode = function() {
+            document.body.classList.add('edit-mode');
             const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="file"]), textarea, select');
             inputs.forEach(input => {
                 input.removeAttribute('readonly');
@@ -211,7 +370,9 @@
                 input.style.backgroundColor = 'white';
             });
 
-            imageUploadBtns.forEach(btn => btn.style.display = 'inline-block');
+            if (logoOverlay) logoOverlay.style.opacity = '1';
+            const bannerButtons = document.querySelectorAll('.banner-upload-overlay');
+            bannerButtons.forEach(btn => btn.style.display = 'block');
             mapActionBtns.forEach(btn => btn.disabled = false);
             
             map.on('click', function (e) {
@@ -232,7 +393,7 @@
         const isVerified = "{{ user.is_verified|yesno:'true,false' }}" === "true";
         const fssaiInput = document.getElementById('id_fssai_number');
         if (isVerified && fssaiInput) {
-            fssaiInput.setAttribute('disabled', 'disabled'); // Prevent editing even in edit mode
+            fssaiInput.setAttribute('disabled', 'disabled');
             fssaiInput.style.opacity = '0.7';
         }
     });

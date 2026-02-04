@@ -408,6 +408,6 @@
 {% if nearest_camp_data and collected_count > 0 and active_pickups == 0 %}
     {{ volunteer_location_data|json_script:"volunteer-location-data" }}
     {{ nearest_camp_data|json_script:"nearest-camp-data" }}
-    <script src="{% static 'js/volunteer_deliveries.js' %}"></script>
+    <script src="{% static 'js/deliveries.js' %}"></script>
 {% endif %}
 {% endblock scripts %}
