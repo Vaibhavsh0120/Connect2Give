@@ -361,11 +361,10 @@ function displayPickupRoute(data) {
     }
     
     pickupMapInstance = L.map('pickup-route-map', {
-        zoomControl: true,
-        attributionControl: false
+        zoomControl: true
     });
     
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickupMapInstance);
+    addOpenStreetMapLayer(pickupMapInstance);
     
     // Ensure map renders correctly after container becomes visible
     setTimeout(() => {
@@ -440,11 +439,10 @@ function renderFallbackMap() {
     }
 
     pickupMapInstance = L.map('pickup-route-map', {
-        zoomControl: true,
-        attributionControl: false
+        zoomControl: true
     });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickupMapInstance);
+    addOpenStreetMapLayer(pickupMapInstance);
 
     setTimeout(() => {
         pickupMapInstance.invalidateSize(true);

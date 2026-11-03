@@ -845,10 +845,9 @@
         // Initialize or update map
         if (!pickupMapInstance) {
             pickupMapInstance = L.map('pickup-route-map', {
-                zoomControl: true,
-                attributionControl: false
+                zoomControl: true
             });
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickupMapInstance);
+            addOpenStreetMapLayer(pickupMapInstance);
         }
         
         // Clear existing routing
@@ -946,11 +945,10 @@
         
         // Initialize map centered between volunteer and camp
         deliveryMapInstance = L.map('delivery-map', {
-            zoomControl: true,
-            attributionControl: false
+            zoomControl: true
             }).setView([volunteerLat, volunteerLon], 14);
         
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(deliveryMapInstance);
+        addOpenStreetMapLayer(deliveryMapInstance);
         
         // Custom bike icon for volunteer
         const bikeIcon = L.divIcon({

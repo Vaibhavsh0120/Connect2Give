@@ -284,11 +284,10 @@
         const initialZoom = parseInt("{{ form.instance.latitude|yesno:'15,11' }}");
 
         const map = L.map('location-map', {
-            zoomControl: false,
-            attributionControl: false
+            zoomControl: false
         }).setView([initialLat, initialLon], initialZoom);
         
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        addOpenStreetMapLayer(map);
 
         let marker = null;
         const latField = document.getElementById('id_latitude');

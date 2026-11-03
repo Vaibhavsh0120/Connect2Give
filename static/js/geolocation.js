@@ -240,7 +240,7 @@ function initializeGeolocationTracker(mapElement, volunteerId = null) {
     let map = null;
     if (mapElement) {
         map = L.map(mapElement).setView([28.6448, 77.2167], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        addOpenStreetMapLayer(map);
     }
     
     // Create tracker

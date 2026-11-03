@@ -301,11 +301,10 @@
         document.addEventListener('DOMContentLoaded', function () {
             // Initialize map centered on Delhi
             map = L.map('camp-map', {
-                zoomControl: false,
-                attributionControl: false
+                zoomControl: false
             }).setView([28.6139, 77.2090], 12);
             
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            addOpenStreetMapLayer(map);
 
             let marker = null;
             const latField = document.getElementById('id_latitude');

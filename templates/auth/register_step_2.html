@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/auth.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="{% static 'js/map-tiles.js' %}"></script>
     <style>
         .hidden-fields {
             display: none;
@@ -192,11 +193,10 @@
             const locationSection = document.getElementById('location-section');
 
             const map = L.map('location-map', {
-                zoomControl: false,
-                attributionControl: false
+                zoomControl: false
             }).setView([28.6448, 77.2167], 11);
             
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            addOpenStreetMapLayer(map);
 
             // Function to update required attributes dynamically
             function updateRequiredFields(selectedType) {

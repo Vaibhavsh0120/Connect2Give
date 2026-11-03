@@ -143,11 +143,10 @@
         document.addEventListener('DOMContentLoaded', function () {
             // --- MAP INITIALIZATION ---
             const map = L.map('dashboard-map', {
-                zoomControl: false,
-                attributionControl: false
+                zoomControl: false
             }).setView([28.6448, 77.2167], 11);
             
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            addOpenStreetMapLayer(map);
 
             const camps = JSON.parse('{{ camps_map_data|safe }}');
             

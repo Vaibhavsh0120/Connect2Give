@@ -160,11 +160,10 @@ function initializeDeliveryMap() {
     
     // Initialize map
     deliveryMapInstance = L.map('delivery-map', {
-        zoomControl: true,
-        attributionControl: false
+        zoomControl: true
     }).setView([volunteerLat, volunteerLon], 14);
     
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(deliveryMapInstance);
+    addOpenStreetMapLayer(deliveryMapInstance);
     
     // Force map to recalculate size after container is visible
     setTimeout(() => {

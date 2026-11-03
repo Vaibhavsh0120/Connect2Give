@@ -691,11 +691,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize map
     const map = L.map('volunteer-location-map', {
-        zoomControl: true,
-        attributionControl: false
+        zoomControl: true
     }).setView([28.6139, 77.2090], 11);
     
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    addOpenStreetMapLayer(map);
 
     let marker = null;
     const latField = document.getElementById('id_volunteer_latitude');

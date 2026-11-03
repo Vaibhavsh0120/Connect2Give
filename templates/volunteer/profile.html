@@ -337,8 +337,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const initialLon = parseFloat("{{ form.instance.longitude|default:'77.2090'|escapejs }}");
     const initialZoom = parseInt("{{ form.instance.latitude|yesno:'15,11' }}");
 
-    const map = L.map('location-map', { zoomControl: false, attributionControl: false }).setView([initialLat, initialLon], initialZoom);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    const map = L.map('location-map', { zoomControl: false }).setView([initialLat, initialLon], initialZoom);
+    addOpenStreetMapLayer(map);
 
     let marker = null;
     const latField = document.getElementById('id_latitude');

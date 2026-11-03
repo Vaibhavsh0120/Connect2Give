@@ -1646,11 +1646,10 @@
 
                 const map = L.map('home-map', {
                     zoomControl: false,
-                    attributionControl: false,
                     scrollWheelZoom: false
                 }).setView([28.6448, 77.2167], 11);
                 
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                addOpenStreetMapLayer(map);
 
                 const camps = JSON.parse(document.getElementById('camps-map-data').textContent);
                 const restaurants = JSON.parse(document.getElementById('restaurants-map-data').textContent);

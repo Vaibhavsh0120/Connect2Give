@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const initialZoom = document.getElementById('id_latitude').value ? 15 : 11;
 
         const map = L.map(mapContainer).setView([initialLat, initialLon], initialZoom);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        addOpenStreetMapLayer(map);
 
         let marker = null;
         const latField = document.getElementById('id_latitude');
