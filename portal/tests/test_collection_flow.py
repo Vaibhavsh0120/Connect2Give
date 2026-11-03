@@ -62,7 +62,7 @@ class VolunteerCollectionFlowTests(TestCase):
         donation.save()
 
         # Trigger cleanup
-        self.client.get(reverse('volunteer_manage_pickups'))
+        self.client.get(reverse('volunteer_pickups'))
 
         donation.refresh_from_db()
         self.assertEqual(donation.status, 'COLLECTED')
@@ -97,7 +97,7 @@ class VolunteerCollectionFlowTests(TestCase):
         )
 
         # Trigger cleanup via the view
-        self.client.get(reverse('volunteer_manage_pickups'))
+        self.client.get(reverse('volunteer_pickups'))
 
         d_accepted.refresh_from_db()
         d_collected.refresh_from_db()

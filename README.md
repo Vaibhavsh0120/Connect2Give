@@ -1,112 +1,73 @@
-# Connect2Give 🌍🤝
+<p align="center">
+  <img src="docs/images/connect2give-banner.svg" alt="Connect2Give. From surplus food to community meals." width="100%">
+</p>
 
-[![Live Demo](https://img.shields.io/badge/LIVE_DEMO-Click_Here-success?style=for-the-badge&logo=pythonanywhere)](https://vaibhav0120.pythonanywhere.com/)
+# Connect2Give
 
+Connect2Give helps restaurants donate surplus food, volunteers coordinate pickups, and NGOs receive and verify deliveries at collection camps.
 
-[![Django](https://img.shields.io/badge/Django-5.2-092E20?style=for-the-badge&logo=django)](https://www.djangoproject.com/)
-[![Python](https://img.shields.io/badge/Python-3.10-3776AB?style=for-the-badge&logo=python)](https://www.python.org/)
-[![Bootstrap](https://img.shields.io/badge/Bootstrap-5-7952B3?style=for-the-badge&logo=bootstrap)](https://getbootstrap.com/)
+**[Live demo](https://vaibhav0120.pythonanywhere.com/)** · [How it works](#how-it-works) · [Quick start](#quick-start) · [Deployment](#deployment)
 
-**Connect2Give** is a comprehensive food donation platform connecting Restaurants, NGOs, and Volunteers to efficiently redistribute surplus food. It features real-time routing, role-based dashboards, and a tiered verification system.
+![Django](https://img.shields.io/badge/Django-Web%20app-0d4738?logo=django)
+![Leaflet](https://img.shields.io/badge/Leaflet-Maps-367d58?logo=leaflet&logoColor=white)
+![PythonAnywhere](https://img.shields.io/badge/PythonAnywhere-Hosting-1d596b?logo=pythonanywhere&logoColor=white)
 
-## 🚀 Live Demo
-**Watch it live here:** [https://vaibhav0120.pythonanywhere.com/](https://vaibhav0120.pythonanywhere.com/)
+## How it works
 
----
+| Role | From listing to delivery |
+| :--- | :--- |
+| **Restaurants** | List surplus food with a quantity and pickup address. Track the status from the restaurant dashboard. |
+| **Volunteers** | Accept donations, plan a pickup route, and bring collected food to an NGO camp. |
+| **NGOs** | Open collection camps, register volunteers, and approve or reject submitted deliveries. |
 
-## 🌟 Core Workflow
-1.  **Restaurants** post surplus food donations.
-2.  **Volunteers** accept pickups, get optimized routes, and collect food.
-3.  **Volunteers** deliver to the nearest NGO Camp.
-4.  **NGOs** verify the delivery digitally and rate the volunteer.
+A donation moves through **Pending pickup → Accepted → Collected → Awaiting verification → Delivered**. If the NGO rejects the delivery, the donation returns to **Collected** so the volunteer can submit it again.
 
-**Donation Lifecycle:**
-`PENDING` → `ACCEPTED` → `COLLECTED` → `VERIFICATION_PENDING` → `DELIVERED`
+The app uses Django templates and Django REST Framework. Leaflet and OpenStreetMap power the maps. Google sign-in, web push, and email can be configured through environment variables.
 
----
+## Quick start
 
-## 👥 Roles & Features
+Use Python 3.12 for the commands below. The example configuration uses SQLite and prints outgoing email to the development console.
 
-### 🍽️ Restaurants
-*   **Donation Management:** Post food details, quantity, and pickup location.
-*   **Web Push Notifications:** Notify nearby volunteers instantly.
-*   **Impact Tracking:** View history of contributions.
-
-### 🚴 Volunteers
-*   **Smart Routing:** Route optimization for multi-stop pickups (via Leaflet & OSRM).
-*   **Camp Locator:** Auto-suggests the nearest active donation camp.
-*   **Gamification:** Earn badges and climb the leaderboard.
-*   **Live Tracking:** Share real-time location with NGOs during deliveries.
-
-### 🏢 NGOs
-*   **Camp Management:** Create and manage donation collection points.
-*   **Digital Verification:** Verify deliveries with a click (no paperwork).
-*   **Volunteer Management:** Register and manage volunteer accounts.
-*   **Live Monitoring:** Track volunteer locations on an interactive map.
-
----
-
-## 🛠️ Tech Stack
-*   **Backend:** Django 5.2, Django REST Framework
-*   **Database:** MySQL (Production), SQLite (Dev)
-*   **Auth:** Django Allauth (Google OAuth)
-*   **Maps & Routing:** Leaflet.js, OpenStreetMap, Leaflet Routing Machine, GeoPy
-*   **Real-time:** Django Channels (WebSocket capabilities), Web Push API
-*   **Frontend:** HTML5, CSS3, JavaScript (ES6+), Bootstrap
-*   **Deployment:** PythonAnywhere
-
----
-
-## ⚙️ Local Installation
-
-**1. Clone the repository**
-```bash
+```powershell
 git clone https://github.com/Vaibhavsh0120/Connect2Give.git
 cd Connect2Give
-```
-
-**2. Setup Virtual Environment**
-```bash
-# Windows
-python -m venv venv
-.\venv\Scripts\activate
-
-# Mac/Linux
-python3 -m venv venv
-source venv/bin/activate
-```
-
-**3. Install Dependencies**
-```bash
-pip install -r requirements.txt
-```
-
-**4. Configure Environment**
-Copy `.env.example` to `.env` and configure your keys (Database, Google OAuth, Email).
-
-**5. Database Setup**
-```bash
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
 python manage.py migrate
-python manage.py createsuperuser
-```
-
-**6. Run Server**
-```bash
 python manage.py runserver
 ```
-Visit `http://127.0.0.1:8000`
 
----
+On macOS or Linux, use `python3.12 -m venv .venv`, `source .venv/bin/activate`, and `cp .env.example .env` in place of the PowerShell equivalents.
 
-## 🧪 Deployment (PythonAnywhere)
-This project is configured for deployment on PythonAnywhere.
-1.  Clone repo to PythonAnywhere.
-2.  Create virtualenv with Python 3.10.
-3.  Install requirements.txt
-4.  Configure Web Tab (Static/Media mappings are crucial).
-5.  Set environment variables in `.env`.
+Open [the local app](http://127.0.0.1:8000/). To use the Django admin, run `python manage.py createsuperuser` and open [the admin dashboard](http://127.0.0.1:8000/admin/).
 
----
+### Local checks
 
-## 📜 License
-This project is built for educational and social impact purposes.
+```bash
+python manage.py check
+python manage.py test
+```
+
+### Optional integrations
+
+| Integration | Configuration |
+| :--- | :--- |
+| **MySQL** | Create a database, set `USE_SQLITE=False`, and fill in the `DB_*` settings. |
+| **Google sign-in** | Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`. Register the app origin plus `/accounts/google/login/callback/` as an authorized redirect URI. |
+| **Web push** | Generate a key pair with `python scripts/generate_keys.py` and configure the `VAPID_*` settings. |
+| **SMTP** | Set `EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend` and fill in the other `EMAIL_*` settings. Run `python -m scripts.check_email` to send a test message to your configured account. |
+
+See [`.env.example`](.env.example) for the full template.
+
+## Deployment
+
+The [live demo](https://vaibhav0120.pythonanywhere.com/) is hosted on PythonAnywhere.
+
+1. Point the Web app at `food_donation_project.wsgi` and select the virtual environment with the project dependencies.
+2. Put the deployment `.env` next to `manage.py`. Set `DEBUG=False`, use a unique `SECRET_KEY`, and configure the production host and MySQL database.
+3. Run `python manage.py migrate` and `python manage.py collectstatic --noinput`.
+4. In the Web tab, map `/static/` to `staticfiles/` and `/media/` to `media/` using absolute paths. Reload the app.
+
+Keep the plaintext `.env` and the age private identity outside Git. The local `agel` PowerShell function writes the encrypted backup to `.env.age` using `AGE_PUBLIC_KEY`.

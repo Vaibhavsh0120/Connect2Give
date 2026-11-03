@@ -30,6 +30,7 @@ env = environ.Env(
     GOOGLE_OAUTH_CLIENT_SECRET=(str, ''),
 
     # DB
+    USE_SQLITE=(bool, False),
     DB_NAME=(str, 'connect2give_db'),
     DB_USER=(str, 'root'),
     DB_PASSWORD=(str, ''),
@@ -115,7 +116,7 @@ ASGI_APPLICATION = 'food_donation_project.asgi.application'
 
 # Database
 # Check if running tests
-if 'test' in sys.argv or 'test_coverage' in sys.argv:
+if env('USE_SQLITE') or 'test' in sys.argv or 'test_coverage' in sys.argv:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',

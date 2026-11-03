@@ -9,7 +9,6 @@ from .api_views import *
 
 # --- HELPER & PUBLIC VIEWS ---
 from django.shortcuts import render, redirect
-import json
 from ..models import User, DonationCamp, RestaurantProfile, Donation
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
@@ -44,18 +43,23 @@ def index(request):
         return get_user_dashboard_redirect(request.user)
         
     # The rest of the function is for non-logged-in users OR Superusers
-    active_camps = DonationCamp.objects.filter(is_active=True).select_related('ngo')
+    active_camps = DonationCamp.objects.filter(
+        is_active=True, latitude__isnull=False, longitude__isnull=False,
+    ).select_related('ngo')
     all_restaurants = RestaurantProfile.objects.filter(latitude__isnull=False, longitude__isnull=False)
-    
-    camps_map_data = []
-    if active_camps.exists():
-        camps_map_data = [{"lat": c.latitude, "lon": c.longitude, "name": c.name, "ngo": c.ngo.ngo_name, "address": c.location_address, "start": c.start_time.strftime('%d %b %Y, %H:%M')} for c in active_camps if c.latitude and c.longitude]
-    
-    restaurants_map_data = []
-    if all_restaurants.exists():
-        restaurants_map_data = [{"lat": r.latitude, "lon": r.longitude, "name": r.restaurant_name, "address": r.address} for r in all_restaurants]
-    
-    context = {'camps_map_data': json.dumps(camps_map_data), 'restaurants_map_data': json.dumps(restaurants_map_data)}
+
+    context = {
+        'camps_map_data': [
+            {'lat': camp.latitude, 'lon': camp.longitude, 'name': camp.name,
+             'ngo': camp.ngo.ngo_name, 'address': camp.location_address}
+            for camp in active_camps
+        ],
+        'restaurants_map_data': [
+            {'lat': restaurant.latitude, 'lon': restaurant.longitude,
+             'name': restaurant.restaurant_name, 'address': restaurant.address}
+            for restaurant in all_restaurants
+        ],
+    }
     return render(request, 'index.html', context)
 
 # Action views used by multiple user types

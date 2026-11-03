@@ -1587,6 +1587,8 @@
     </script>
 
     {% if not user.is_authenticated %}
+        {{ camps_map_data|json_script:"camps-map-data" }}
+        {{ restaurants_map_data|json_script:"restaurants-map-data" }}
         <script>
             // --- UPDATED HERO BACKGROUND SLIDER LOGIC ---
             document.addEventListener('DOMContentLoaded', function () {
@@ -1650,8 +1652,8 @@
                 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-                const camps = JSON.parse('{{ camps_map_data|safe }}');
-                const restaurants = JSON.parse('{{ restaurants_map_data|safe }}');
+                const camps = JSON.parse(document.getElementById('camps-map-data').textContent);
+                const restaurants = JSON.parse(document.getElementById('restaurants-map-data').textContent);
 
                 const campIcon = L.divIcon({
                     className: 'custom-marker',
@@ -1667,14 +1669,30 @@
                     iconAnchor: [16, 16]
                 });
 
-                restaurants.forEach(r => {
-                    L.marker([r.lat, r.lon], { icon: restaurantIcon }).addTo(map)
-                     .bindPopup(`<div style="padding: 0.5rem;"><strong>${r.name}</strong><br><span style="color: #393E46;">${r.address}</span></div>`);
+                function createMapPopup(title, address, organization) {
+                    const popup = document.createElement('div');
+                    popup.style.padding = '0.5rem';
+                    const heading = document.createElement('strong');
+                    heading.textContent = title;
+                    popup.append(heading, document.createElement('br'));
+                    if (organization) {
+                        popup.append('NGO: ' + organization, document.createElement('br'));
+                    }
+                    const addressLine = document.createElement('span');
+                    addressLine.style.color = '#393E46';
+                    addressLine.textContent = address;
+                    popup.append(addressLine);
+                    return popup;
+                }
+
+                restaurants.forEach(restaurant => {
+                    L.marker([restaurant.lat, restaurant.lon], { icon: restaurantIcon }).addTo(map)
+                     .bindPopup(createMapPopup(restaurant.name, restaurant.address));
                 });
 
                 camps.forEach(camp => {
                     L.marker([camp.lat, camp.lon], { icon: campIcon }).addTo(map)
-                     .bindPopup(`<div style="padding: 0.5rem;"><strong>Camp: ${camp.name}</strong><br>NGO: ${camp.ngo}<br><span style="color: #393E46;">${camp.address}</span></div>`);
+                     .bindPopup(createMapPopup('Camp: ' + camp.name, camp.address, camp.ngo));
                 });
 
                 // Animated counter function with smooth rotation effect
