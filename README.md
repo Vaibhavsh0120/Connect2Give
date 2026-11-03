@@ -2,15 +2,24 @@
   <img src="docs/images/connect2give-banner.svg" alt="Connect2Give. From surplus food to community meals." width="100%">
 </p>
 
-# Connect2Give
+<h1 align="center">Connect2Give</h1>
 
-Connect2Give helps restaurants donate surplus food, volunteers coordinate pickups, and NGOs receive and verify deliveries at collection camps.
+<p align="center">
+  Connect2Give helps restaurants donate surplus food, volunteers coordinate pickups, and NGOs receive and verify deliveries at collection camps.
+</p>
 
-**[Live demo](https://vaibhav0120.pythonanywhere.com/)** · [How it works](#how-it-works) · [Quick start](#quick-start) · [Deployment](#deployment)
+<p align="center">
+  <strong><a href="https://vaibhavsh0120.pythonanywhere.com/">Live demo</a></strong>
+  · <a href="#how-it-works">How it works</a>
+  · <a href="#quick-start">Quick start</a>
+  · <a href="#deployment">Deployment</a>
+</p>
 
-![Django](https://img.shields.io/badge/Django-Web%20app-0d4738?logo=django)
-![Leaflet](https://img.shields.io/badge/Leaflet-Maps-367d58?logo=leaflet&logoColor=white)
-![PythonAnywhere](https://img.shields.io/badge/PythonAnywhere-Hosting-1d596b?logo=pythonanywhere&logoColor=white)
+<p align="center">
+  <img src="https://img.shields.io/badge/Django-Web%20app-0d4738?logo=django" alt="Django">
+  <img src="https://img.shields.io/badge/Leaflet-Maps-367d58?logo=leaflet&amp;logoColor=white" alt="Leaflet">
+  <img src="https://img.shields.io/badge/PythonAnywhere-Hosting-1d596b?logo=pythonanywhere&amp;logoColor=white" alt="PythonAnywhere">
+</p>
 
 ## How it works
 
@@ -63,10 +72,10 @@ See [`.env.example`](.env.example) for the full template.
 
 ## Deployment
 
-The [live demo](https://vaibhav0120.pythonanywhere.com/) is hosted on PythonAnywhere.
+The [live demo](https://vaibhavsh0120.pythonanywhere.com/) runs on PythonAnywhere with SQLite.
 
 1. Point the Web app at `food_donation_project.wsgi` and select the virtual environment with the project dependencies.
-2. Put the deployment `.env` next to `manage.py`. Set `DEBUG=False`, use a unique `SECRET_KEY`, and configure the production host and MySQL database.
+2. Put the deployment `.env` next to `manage.py`. Set `DEBUG=False`, use a unique `SECRET_KEY`, and add your hostname to `ALLOWED_HOSTS`. Set `USE_SQLITE=True` to match the live demo.
 3. Run `python manage.py migrate` and `python manage.py collectstatic --noinput`.
 4. In the Web tab, map `/static/` to `staticfiles/` and `/media/` to `media/` using absolute paths. Reload the app.
 
